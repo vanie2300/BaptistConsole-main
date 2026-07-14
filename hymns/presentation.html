@@ -1,0 +1,200 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>Presentation</title>
+<meta name="viewport" content="width=1024, initial-scale=1.0">
+<link rel="stylesheet" href="../theme.css?v=5">
+<script>
+  (() => {
+    const theme = localStorage.getItem('globalTheme');
+    if (theme === 'light') {
+      document.documentElement.classList.add('theme-light');
+    }
+  })();
+</script>
+<style>
+body {
+    margin: 0;
+    background: var(--bg);
+    color: var(--text);
+    width: 100vw;
+    height: 100vh;
+    overflow: hidden;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+#slideContent {
+    
+    display: flex;
+    flex-direction: column;
+    justify-content: flex-start;   /* Snap content to top */
+    align-items: stretch;          /* Make children full width */
+    padding: 2vw 3vw;
+    text-align: left;
+    overflow-y: hidden;
+    font-family: var(--font-main, 'Segoe UI', 'Arial', sans-serif);
+    border: none;
+    gap: 2vw;
+    font-weight: bold;
+}
+.slide-label {
+    font-weight: bold;
+    font-size: 2vw;
+    margin: 0;
+    padding: 0;
+    color: var(--primary);
+    letter-spacing: 0.05em;
+    text-shadow: 0 2px 8px rgba(0, 0, 0, 0.4);
+}
+.slide-title {
+    font-weight: bold;
+    font-size: 7vw;
+    width: 100%;
+ 
+    color: var(--text);
+    text-shadow: 0 2px 8px rgba(0, 0, 0, 0.4);
+   
+    display: flex;
+    justify-content: center;
+    align-items: center;
+}
+.slide-lyrics {
+    font-size: 1vw;
+    line-height: 1.18;
+    color: var(--text);
+    text-shadow: 0 2px 8px rgba(0, 0, 0, 0.4);
+    width: 100%;
+    word-break: break-word;
+}
+#slideContent.centered {
+    justify-content: center !important;
+    align-items: center !important;
+}
+@media (max-width: 700px) {
+    #slideContent { padding: 4vw 2vw; }
+    .slide-label { font-size: 6vw; }
+    .slide-title { font-size: 10vw; }
+    .slide-lyrics { font-size: 8vw; }
+}
+</style>
+</head>
+<body data-ui="hymn-presentation-body">
+<!-- UI GROUP: Presentation Stage -->
+<div id="slideContent" data-ui="hymn-presentation-stage"><em>Waiting for slides...</em></div>
+<script src="../theme.js?v=5"></script>
+<script>
+let slides = [];
+let currentIndex = 0;
+
+function requestFullscreenSafe() {
+    try {
+        if (document.fullscreenElement) return;
+        const el = document.documentElement;
+        if (el.requestFullscreen) {
+            el.requestFullscreen().catch(() => {});
+        }
+    } catch (err) {
+        // Ignore fullscreen errors (browser policy, etc).
+    }
+}
+
+function maximizeWindow() {
+    const isElectron = navigator.userAgent.toLowerCase().includes('electron');
+    if (isElectron) return;
+    try {
+        window.moveTo(0, 0);
+        window.resizeTo(screen.availWidth, screen.availHeight);
+    } catch (err) {
+        // Ignore resize errors (browser policy, etc).
+    }
+}
+
+function escapeHtml(text) {
+    return String(text).replace(/[&<>"']/g, m => ({
+        '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;'
+    })[m]);
+}
+
+function renderSlide() {
+    const slide = slides[currentIndex] || { lines: ['End of hymn'] };
+    const container = document.getElementById('slideContent');
+    if (slide.type === 'title') {
+        container.classList.add('centered');
+        container.innerHTML = `
+            <div class="slide-title" id="autoFitTarget">${escapeHtml(slide.title)}</div>
+        `;
+        autoFitText(document.getElementById('autoFitTarget'), 7, 2);
+    } else {
+        container.classList.remove('centered');
+        const label = slide.type === 'chorus' ? 'Chorus' : 'Verse ' + slide.number;
+        const content = (slide.lines || []).map(escapeHtml).join('<br>');
+        container.innerHTML = `
+            <div class="slide-label" id="autoFitLabel">${label}</div>
+            <div class="slide-lyrics" id="autoFitLyrics">${content}</div>
+        `;
+        autoFitText(document.getElementById('autoFitLyrics'), 6.5, 4);
+        autoFitText(document.getElementById('autoFitLabel'), 3, 1.2);
+    }
+    // Auto-fit text in the container
+    autoFitText(container);
+}
+
+function autoFitText(container, maxFont = 8, minFont = 4) {
+    // Try to fit the text by shrinking font-size (in vw) until it fits or hits minFont
+    let fontSize = maxFont;
+    container.style.fontSize = fontSize + 'vw';
+    // Use a timeout to ensure rendering is complete
+    setTimeout(() => {
+        while ((container.scrollHeight > container.parentElement.clientHeight || container.scrollWidth > container.parentElement.clientWidth) && fontSize > minFont) {
+            fontSize -= 0.2;
+            container.style.fontSize = fontSize + 'vw';
+        }
+    }, 0);
+}
+
+// Listen for messages from the main window
+window.addEventListener('message', function(e) {
+    if (e.data && e.data.type === 'init') {
+        slides = e.data.slides;
+        currentIndex = e.data.currentIndex;
+        renderSlide();
+    } else if (e.data && e.data.type === 'navigate') {
+        currentIndex = e.data.currentIndex;
+        renderSlide();
+    }
+});
+
+window.addEventListener('load', function() {
+    maximizeWindow();
+    requestFullscreenSafe();
+});
+window.addEventListener('click', requestFullscreenSafe);
+
+// Keyboard navigation (optional)
+window.addEventListener('keydown', function(e) {
+    if (!slides.length) return;
+    if (e.key === 'ArrowRight' || e.key === 'PageDown') {
+        if (currentIndex < slides.length - 1) {
+            currentIndex++;
+            renderSlide();
+            if (window.opener && !window.opener.closed) {
+                window.opener.postMessage({ type: 'navigateFromPopup', currentIndex }, '*');
+            }
+        }
+    } else if (e.key === 'ArrowLeft' || e.key === 'PageUp') {
+        if (currentIndex > 0) {
+            currentIndex--;
+            renderSlide();
+            if (window.opener && !window.opener.closed) {
+                window.opener.postMessage({ type: 'navigateFromPopup', currentIndex }, '*');
+            }
+        }
+    } else if (e.key === 'Escape') {
+        window.close();
+    }
+});
+</script>
+</body>
+</html>

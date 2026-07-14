@@ -1,0 +1,149 @@
+/* ═══════════════════════════════════════
+   BAPTIST CONSOLE — DESIGN SYSTEM
+   Single source of truth for all tokens.
+   Dark = default. Light = .theme-light.
+   ═══════════════════════════════════════ */
+
+:root {
+  /* ── Typography & Layout ── */
+  --font-main: 'Inter', system-ui, sans-serif;
+  --font-size: 16px;
+  --radius: 1rem;
+  --transition: 0.25s ease;
+
+  /* ── Background Hierarchy ── */
+  --bg: #0e0e0e;
+  --surface: #171717;
+  --surface-hover: #1c1c1c;
+  --surface-muted: #212121;
+
+  /* ── Text Hierarchy ── */
+  --text: #d8d8d8;
+  --text-secondary: #999999;
+  --text-muted: #666666;
+
+  /* ── Borders ── */
+  --border: #262626;
+
+  /* ── Primary / Accent ── */
+  --primary: #4169E1;
+  --primary-hover: #3558c0;
+  --primary-14: rgba(65, 105, 225, 0.14);
+  --primary-20: rgba(65, 105, 225, 0.2);
+  --primary-25: rgba(65, 105, 225, 0.25);
+  --primary-40: rgba(65, 105, 225, 0.4);
+  --primary-60: rgba(65, 105, 225, 0.6);
+
+  /* ── Semantic ── */
+  --danger: #994444;
+  --success: #3d8060;
+  --link: #4169E1;
+  --highlight: #4169E1;
+  --highlight-soft: rgba(65, 105, 225, 0.15);
+
+  /* ── Shadows ── */
+  --shadow-sm: 0 1px 3px rgba(0, 0, 0, 0.24);
+  --shadow-md: 0 4px 12px rgba(0, 0, 0, 0.3);
+  --shadow-lg: 0 12px 40px rgba(0, 0, 0, 0.4);
+  --shadow-xl: 0 20px 60px rgba(0, 0, 0, 0.5);
+
+  /* ── Overlay ── */
+  --overlay: rgba(0, 0, 0, 0.6);
+}
+
+/* ── Light Theme Override ── */
+.theme-light {
+  --bg: #f8f9fa;
+  --surface: #ffffff;
+  --surface-hover: #f1f3f5;
+  --surface-muted: #f1f3f5;
+
+  --text: #212529;
+  --text-secondary: #5c5f66;
+  --text-muted: #adb5bd;
+
+  --border: #dee2e6;
+
+  --primary: #3368C4;
+  --primary-hover: #2856a8;
+  --primary-14: rgba(51, 104, 196, 0.14);
+  --primary-20: rgba(51, 104, 196, 0.2);
+  --primary-25: rgba(51, 104, 196, 0.25);
+  --primary-40: rgba(51, 104, 196, 0.4);
+  --primary-60: rgba(51, 104, 196, 0.6);
+
+  --danger: #ef4444;
+  --success: #22c55e;
+  --link: #3368C4;
+  --highlight: #3368C4;
+  --highlight-soft: rgba(51, 104, 196, 0.15);
+
+  --shadow-sm: 0 1px 3px rgba(0, 0, 0, 0.08);
+  --shadow-md: 0 4px 12px rgba(0, 0, 0, 0.08);
+  --shadow-lg: 0 12px 40px rgba(0, 0, 0, 0.12);
+  --shadow-xl: 0 20px 60px rgba(0, 0, 0, 0.15);
+
+  --overlay: rgba(0, 0, 0, 0.5);
+}
+
+/* ═══════════════════════════════════════
+   BASE RESETS
+   ═══════════════════════════════════════ */
+
+body {
+  background: var(--bg);
+  color: var(--text);
+  font-family: var(--font-main);
+  font-size: var(--font-size);
+  transition: background var(--transition), color var(--transition);
+}
+
+a {
+  color: var(--primary);
+  text-decoration: none;
+  transition: color var(--transition);
+}
+
+a:hover {
+  color: var(--primary-hover);
+}
+
+a:visited {
+  color: var(--primary);
+}
+
+a:visited:hover {
+  color: var(--primary-hover);
+}
+
+h1, h2, h3 {
+  color: inherit;
+  margin-top: 0;
+}
+
+ul {
+  list-style: none;
+  padding: 0;
+}
+
+li {
+  margin: 0.5em 0;
+}
+
+/* ═══════════════════════════════════════
+   SCROLLBAR
+   ═══════════════════════════════════════ */
+
+::-webkit-scrollbar {
+  width: 8px;
+  background: var(--surface-muted);
+}
+
+::-webkit-scrollbar-thumb {
+  background: var(--border);
+  border-radius: 8px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: var(--primary);
+}

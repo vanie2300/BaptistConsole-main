@@ -1,0 +1,62 @@
+{
+  "name": "baptist-console",
+  "version": "2.0.0",
+  "description": "Baptist Console — Church Presentation Suite",
+  "main": "main.js",
+  "author": "Jovanie Cangke",
+  "license": "MIT",
+  "scripts": {
+    "start": "electron .",
+    "build:win": "electron-builder --win",
+    "build:linux": "electron-builder --linux"
+  },
+  "build": {
+    "appId": "com.baptistconsole.app",
+    "productName": "Baptist Console",
+    "directories": {
+      "output": "dist"
+    },
+    "files": [
+      "main.js",
+      "preload.js",
+      "index.html",
+      "theme.css",
+      "theme.js",
+      "shell.css",
+      "shell.js",
+      "mainPage.css",
+      "bible/**/*",
+      "hymns/**/*",
+      "icon.png",
+      "icon.ico"
+    ],
+    "win": {
+      "target": [
+        {
+          "target": "nsis",
+          "arch": ["x64"]
+        }
+      ],
+      "icon": "icon.ico"
+    },
+    "nsis": {
+      "oneClick": false,
+      "perMachine": false,
+      "allowToChangeInstallationDirectory": true,
+      "installerIcon": "icon.ico",
+      "uninstallerIcon": "icon.ico",
+      "installerHeaderIcon": "icon.ico",
+      "createDesktopShortcut": true,
+      "createStartMenuShortcut": true,
+      "shortcutName": "Baptist Console"
+    },
+    "linux": {
+      "target": ["AppImage"],
+      "category": "Utility",
+      "icon": "icon.png"
+    }
+  },
+  "devDependencies": {
+    "electron-builder": "^25.1.8"
+  }
+}

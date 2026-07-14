@@ -1,0 +1,217 @@
+﻿<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <title>Bible Console</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <link rel="stylesheet" href="../theme.css?v=5" />
+  <link rel="stylesheet" href="bible_presenter.css?v=5" />
+  <script>
+    (() => {
+      const theme = localStorage.getItem('globalTheme');
+      if (theme === 'light') {
+        document.documentElement.classList.add('theme-light');
+      }
+    })();
+  </script>
+</head>
+<body>
+  <!-- UI GROUP: Window Bar -->
+  <div class="window-bar" data-ui="bible-window-bar">
+    <div class="window-title">Bible Console</div>
+    <div class="window-controls" data-ui="bible-window-controls">
+      <button class="window-btn" data-window-action="minimize" aria-label="Minimize">&minus;</button>
+      <button class="window-btn" data-window-action="maximize" aria-label="Maximize">&#9633;</button>
+      <button class="window-btn close" data-window-action="close" aria-label="Close">&times;</button>
+    </div>
+  </div>
+  <div class="app-shell" data-ui="bible-layout-shell">
+    <!-- UI GROUP: Left Panel (Dropdowns + Present) -->
+    <aside class="panel panel-left" data-ui="bible-sidebar-panel">
+      <header class="panel-header">
+        <div>
+          <a class="back-link" href="../index.html">&#8592; Home</a>
+          <h1 class="app-title">Bible Console</h1>
+          <p class="app-subtitle">KJV 1611</p>
+        </div>
+      </header>
+
+      <section class="control-group" data-ui="bible-reference-selectors">
+        <!-- Book dropdown -->
+        <div class="control-block">
+          <label for="bookSelect" class="control-label">Book</label>
+          <select id="bookSelect">
+            <option value="">Select a book...</option>
+          </select>
+        </div>
+
+        <!-- Chapter dropdown -->
+        <div class="control-block">
+          <label for="chapterSelect" class="control-label">Chapter</label>
+          <select id="chapterSelect" disabled>
+            <option value="">Select a chapter...</option>
+          </select>
+        </div>
+
+        <!-- Verse dropdown -->
+        <div class="control-block">
+          <label for="verseSelect" class="control-label">Verse</label>
+          <select id="verseSelect" disabled>
+            <option value="">Select a verse...</option>
+          </select>
+        </div>
+      </section>
+
+      <!-- PRESENT BUTTONS -->
+      <section class="present-section" data-ui="bible-present-controls">
+        <div class="present-actions" data-ui="bible-display-action">
+          <button id="displayBtn" class="present-button" data-ui="bible-display-button" type="button">
+            Display Verse
+          </button>
+        </div>
+        <label class="preview-toggle" data-ui="bible-auto-display-toggle" for="previewToggle">
+          <input id="previewToggle" data-ui="bible-auto-display-input" type="checkbox" checked />
+          <span>Auto-display on select</span>
+        </label>
+        <div class="present-status" id="presentStatus">Presenter: Off</div>
+      </section>
+    </aside>
+
+    <!-- CENTER PANEL: SEARCH + CURRENT VERSE -->
+    <main class="panel panel-center" data-ui="bible-main-panel">
+      <!-- Search dropdown area -->
+      <section class="search-shell" data-ui="bible-search-panel">
+        <button id="searchToggle" class="search-toggle" type="button">
+          <span>Search</span>
+          <span aria-hidden="true">&#9662;</span>
+        </button>
+
+        <div id="searchDropdown" class="search-dropdown" data-ui="bible-search-dropdown" hidden>
+          <div class="search-section">
+            <p class="search-label">Search Type</p>
+            <div class="search-options">
+              <label>
+                <input
+                  type="radio"
+                  name="searchMode"
+                  value="reference"
+                  checked
+                />
+                Reference (e.g. John 3:16)
+              </label>
+              <label>
+                <input type="radio" name="searchMode" value="keyword" />
+                Keyword (e.g. faith)
+              </label>
+            </div>
+          </div>
+
+          <div class="search-section">
+            <p class="search-label">Scope (for keyword search)</p>
+            <select id="searchScope">
+              <option value="bible" selected>Whole Bible</option>
+              <option value="book">Current Book</option>
+              <option value="chapter">Current Chapter</option>
+            </select>
+          </div>
+
+          <div class="search-section search-input-row">
+            <input
+              id="searchInput"
+              type="text"
+              placeholder="Enter reference or keyword..."
+              autocomplete="off"
+            />
+            <button id="searchSubmit" type="button">Go</button>
+          </div>
+
+          <div class="search-section search-meta">
+            <div id="searchResultHint" class="search-hint">Ready to search.</div>
+            <div class="search-shortcuts">Enter to search | Esc to close</div>
+          </div>
+
+          <div class="search-section search-actions">
+            <button id="searchClear" type="button">Clear Search</button>
+          </div>
+        </div>
+      </section>
+
+      <!-- Current verse display -->
+      <section class="verse-display" data-ui="bible-preview-card">
+        <header class="verse-header">
+          <div id="currentReference" class="current-reference">
+            No verse selected
+          </div>
+        </header>
+
+        <article class="verse-body">
+          <p id="currentText" class="current-text">
+            Select a book, chapter, and verse from the left, or use the search
+            dropdown above.
+          </p>
+        </article>
+
+        <!-- Prev / next + font size -->
+        <footer class="verse-footer" data-ui="bible-preview-footer">
+          <div class="verse-nav-group" data-ui="bible-prev-next-controls">
+            <button id="prevVerseBtn" type="button">Prev</button>
+            <button id="nextVerseBtn" type="button">Next</button>
+          </div>
+
+          <div class="control-block presenter-display" id="presenterDisplayWrap" data-ui="bible-presenter-display-select">
+            <select id="presenterDisplayPicker">
+              <option value="">Default Display</option>
+            </select>
+          </div>
+
+          <div class="font-size-controls" data-ui="bible-font-controls">
+            <button id="fontMinus" type="button" class="font-btn">A-</button>
+            <button id="fontPlus" type="button" class="font-btn">A+</button>
+            <button id="fontAuto" type="button" class="font-btn">Auto Fit</button>
+          </div>
+        </footer>
+      </section>
+
+      <!-- Status line / messages -->
+      <section class="status-bar" data-ui="bible-status-bar">
+        <p id="statusMessage">Loading Bible data...</p>
+      </section>
+    </main>
+
+    <!-- RIGHT PANEL: VERSE LIST -->
+    <aside class="panel panel-right" data-ui="bible-verse-list-panel">
+      <header class="panel-header">
+        <div id="versesHeader" class="verses-header">
+          Verses
+        </div>
+        <div id="versesSubHeader" class="verses-subheader">
+          Select a book and chapter to view verses.
+        </div>
+      </header>
+
+      <section id="versesList" class="verses-list" data-ui="bible-verse-list">
+        <!-- Verse rows will be generated by JS -->
+      </section>
+    </aside>
+  </div>
+
+  <script src="../theme.js?v=5"></script>
+  <script src="bible.js?v=5"></script>
+  <script>
+    (() => {
+      if (window.self !== window.top) document.body.classList.add('in-iframe');
+      const controls = window.windowControls;
+      document.querySelectorAll('[data-window-action]').forEach((btn) => {
+        btn.addEventListener('click', () => {
+          if (!controls) return;
+          const action = btn.getAttribute('data-window-action');
+          if (action === 'minimize') controls.minimize();
+          if (action === 'maximize') controls.maximize();
+          if (action === 'close') controls.close();
+        });
+      });
+    })();
+  </script>
+</body>
+</html>
+
