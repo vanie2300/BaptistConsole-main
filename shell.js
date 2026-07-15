@@ -6,6 +6,11 @@
   const indicator = document.getElementById('tabIndicator');
   const activeModuleLabel = document.getElementById('activeModule');
 
+  if (!bibleFrame || !hymnFrame || !indicator || !activeModuleLabel) {
+    console.error('Required DOM elements missing');
+    return;
+  }
+
   const modules = {
     bible: { frame: bibleFrame, label: 'Bible' },
     hymns: { frame: hymnFrame, label: 'Hymns' },
@@ -32,6 +37,7 @@
   function moveIndicator(tabEl) {
     if (!tabEl) return;
     const bar = document.getElementById('tabBar');
+    if (!bar) return;
     const barRect = bar.getBoundingClientRect();
     const tabRect = tabEl.getBoundingClientRect();
     indicator.style.left = (tabRect.left - barRect.left) + 'px';
@@ -99,14 +105,27 @@
         if (parsed._v === DEFAULTS._v) {
           settings = { ...DEFAULTS, ...parsed };
         } else {
-          localStorage.removeItem('baptistSettings');
+          const preserved = {};
+          for (const key of Object.keys(DEFAULTS)) {
+            if (key in parsed && key !== '_v') {
+              preserved[key] = parsed[key];
+            }
+          }
+          settings = { ...DEFAULTS, ...preserved };
+          saveSettings();
         }
       }
-    } catch (e) {}
+    } catch (e) {
+      console.warn('Failed to load settings, using defaults');
+    }
   }
 
   function saveSettings() {
-    localStorage.setItem('baptistSettings', JSON.stringify(settings));
+    try {
+      localStorage.setItem('baptistSettings', JSON.stringify(settings));
+    } catch (e) {
+      console.error('Failed to save settings:', e);
+    }
   }
 
   // ── Settings UI Panels ──
@@ -144,7 +163,7 @@
   }
 
   function renderToggle(name, current) {
-    return `<button class="toggle${current ? ' active' : ''}" data-setting="${name}" data-type="toggle"></button>`;
+    return `<button class="toggle${current ? ' active' : ''}" data-setting="${name}" data-type="toggle" role="switch" aria-checked="${current}" aria-label="${name}"></button>`;
   }
 
   function getPanel(catId) {
@@ -291,7 +310,7 @@
           <div class="settings-row" style="margin-top:16px;">
             <div>
               <div class="settings-label" style="margin-bottom:4px;">Baptist Console</div>
-              <div style="font-size:0.75rem;color:var(--text-muted)">Version 2.0.0</div>
+              <div style="font-size:0.75rem;color:var(--text-muted)">Version 1.0.0-dev</div>
               <div style="font-size:0.75rem;color:var(--text-muted)">Created by Jovanie Cangke</div>
             </div>
           </div>
@@ -341,7 +360,12 @@
     // Number inputs
     content.querySelectorAll('input[type="number"]').forEach((inp) => {
       inp.addEventListener('change', () => {
-        settings[inp.id] = Number(inp.value);
+        const num = Number(inp.value);
+        if (Number.isFinite(num)) {
+          const min = inp.hasAttribute('min') ? Number(inp.min) : -Infinity;
+          const max = inp.hasAttribute('max') ? Number(inp.max) : Infinity;
+          settings[inp.id] = Math.min(max, Math.max(min, num));
+        }
       });
     });
 
@@ -362,7 +386,7 @@
         a.href = url;
         a.download = 'baptist-console-settings.json';
         a.click();
-        URL.revokeObjectURL(url);
+        setTimeout(() => URL.revokeObjectURL(url), 1000);
       });
     }
 
@@ -377,11 +401,25 @@
         const reader = new FileReader();
         reader.onload = () => {
           try {
-            settings = { ...DEFAULTS, ...JSON.parse(reader.result) };
+            const imported = JSON.parse(reader.result);
+            if (typeof imported !== 'object' || imported === null || Array.isArray(imported)) {
+              alert('Invalid settings file format.');
+              return;
+            }
+            const safeKeys = Object.keys(DEFAULTS);
+            const filtered = {};
+            for (const key of safeKeys) {
+              if (key in imported) {
+                filtered[key] = imported[key];
+              }
+            }
+            settings = { ...DEFAULTS, ...filtered };
             saveSettings();
             applyAllSettings();
             showPanel('advanced');
-          } catch (e) {}
+          } catch (e) {
+            alert('Could not parse settings file.');
+          }
         };
         reader.readAsText(file);
       });
@@ -429,20 +467,28 @@
       pushToIframes({ accent: color });
     }
     if (key === 'font') {
-      document.body.style.fontFamily = `'${value}', system-ui, sans-serif`;
+      document.documentElement.style.setProperty('--font-main', `'${value}', system-ui, sans-serif`);
+      pushToIframes({ font: value });
     }
+    if (key === 'corners') {
+      const sizes = { small: '6px', medium: '10px', large: '16px' };
+      document.documentElement.style.setProperty('--radius', sizes[value] || '10px');
+    }
+    if (key === 'density') {
+      const header = document.querySelector('.shell-header');
+      if (header) header.classList.toggle('compact', value === 'compact');
+    }
+    if (key === 'animations') {
+      document.body.classList.toggle('no-animations', !value);
+    }
+    pushToIframes({ settings });
   }
 
   function pushToIframes(opts) {
     [bibleFrame, hymnFrame].forEach((frame) => {
       try {
-        const doc = frame.contentDocument || frame.contentWindow.document;
-        if (opts.theme) {
-          doc.documentElement.classList.toggle('theme-light', opts.theme === 'light');
-        }
-        if (opts.accent) {
-          setAccentVars(doc.documentElement, opts.accent);
-        }
+        const win = frame.contentWindow;
+        if (win) win.postMessage({ type: 'settingsUpdate', settings }, '*');
       } catch (e) {}
     });
   }
@@ -451,6 +497,9 @@
     applySettingLive('theme', settings.theme);
     applySettingLive('accent', settings.accent);
     applySettingLive('font', settings.font);
+    applySettingLive('corners', settings.corners);
+    applySettingLive('density', settings.density);
+    applySettingLive('animations', settings.animations);
   }
 
   // ── Modal Open/Close ──
@@ -490,6 +539,7 @@
 
   resetBtn.addEventListener('click', () => {
     settings = { ...DEFAULTS };
+    saveSettings();
     applyAllSettings();
     showPanel('appearance');
     sidebar.querySelectorAll('.settings-cat').forEach((c) => {
@@ -527,9 +577,9 @@
   });
 
   // ── Window Controls ──
-  const collapseBtn = document.getElementById('collapseBtn');
   const maximizeBtn = document.getElementById('maximizeBtn');
   const minimizeBtn = document.getElementById('minimizeBtn');
+  const winCloseBtn = document.getElementById('closeBtn');
   const header = document.querySelector('.shell-header');
   const isElectron = navigator.userAgent.toLowerCase().includes('electron');
 
@@ -557,23 +607,16 @@
     });
   }
 
-  // Collapse — toggle compact header
-  let headerCollapsed = localStorage.getItem('headerCollapsed') === 'true';
-
-  function applyCollapse() {
-    header.classList.toggle('compact', headerCollapsed);
-    moveIndicator(document.querySelector('.tab.active'));
-  }
-
-  if (collapseBtn) {
-    collapseBtn.addEventListener('click', () => {
-      headerCollapsed = !headerCollapsed;
-      localStorage.setItem('headerCollapsed', String(headerCollapsed));
-      applyCollapse();
+  // Close
+  if (winCloseBtn) {
+    winCloseBtn.addEventListener('click', () => {
+      if (isElectron && window.windowControls) {
+        window.windowControls.close();
+      } else {
+        window.close();
+      }
     });
   }
-
-  applyCollapse();
 
   // ── Init ──
   loadSettings();
@@ -581,8 +624,10 @@
   // Push settings once each iframe finishes loading
   [bibleFrame, hymnFrame].forEach((frame) => {
     frame.addEventListener('load', () => {
-      const color = ACCENT_COLORS[settings.accent] || ACCENT_COLORS.blue;
-      pushToIframes({ theme: settings.theme, accent: color });
+      try {
+        const win = frame.contentWindow;
+        if (win) win.postMessage({ type: 'settingsUpdate', settings }, '*');
+      } catch (e) {}
     });
   });
 

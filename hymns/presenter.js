@@ -38,6 +38,7 @@
   let presenterDisplayLabel = '';
   let presenterDisplayIsAuto = true;
   let presenterAutoDisplayLabel = '';
+  let isInitialized = false;
 
   const setStatus = (msg, isError = false) => {
     refs.status.textContent = msg || '';
@@ -83,6 +84,7 @@
   };
 
   const getMaxLines = (lines) => {
+    if (!lines || lines.length === 0) return 2;
     const longLines = lines.filter((line) => line.length > 35).length;
     const ratio = longLines / lines.length;
     if (ratio === 0) return 4;
@@ -91,6 +93,9 @@
   };
 
   const buildSlidesFromLines = (type, lines, number = null) => {
+    if (appSettings.autoSplitStanzas === false) {
+      return [{ type, lines, ...(number !== null && { number }) }];
+    }
     const maxLines = getMaxLines(lines);
     const chunks = chunkLines(lines, maxLines);
     return chunks.map((chunk) => ({
@@ -124,9 +129,10 @@
     }
 
     const textLength = wrapper.textContent.length;
+    const fontScale = (appSettings.hymnFontSize || 48) / 48;
     let fontSize;
-    if (mode === 'current') fontSize = textLength < 80 ? '3.6vw' : '2.6vw';
-    else if (mode === 'next') fontSize = textLength < 80 ? '2vw' : '1.4vw';
+    if (mode === 'current') fontSize = textLength < 80 ? (3.6 * fontScale) + 'vw' : (2.6 * fontScale) + 'vw';
+    else if (mode === 'next') fontSize = textLength < 80 ? (2 * fontScale) + 'vw' : (1.4 * fontScale) + 'vw';
     else fontSize = textLength > 150 ? '0.65rem' : '0.8rem';
     wrapper.style.fontSize = fontSize;
     return wrapper.outerHTML;
@@ -167,6 +173,7 @@
     refs.nextBtn.disabled = state.currentIndex >= state.slides.length - 1;
     refs.presentBtn.disabled = false;
     updateDeleteState();
+    applyHymnsSettings();
   };
 
   const navigate = (step) => {
@@ -189,6 +196,13 @@
     renderSlides();
     renderList();
     updateDeleteState();
+    if (state.presentationWindow && !state.presentationWindow.closed) {
+      state.presentationWindow.postMessage({
+        type: 'init',
+        slides: state.slides,
+        currentIndex: state.currentIndex,
+      }, '*');
+    }
   };
 
   const filterList = () => {
@@ -199,6 +213,17 @@
         (h) => (h.id ?? h.title) === state.selectedId
       );
       state.selectedIndex = nextIndex >= 0 ? nextIndex : null;
+      if (nextIndex < 0) {
+        state.selectedId = null;
+        state.slides = [];
+        state.currentIndex = 0;
+        refs.currentSlide.innerHTML = '<em>Select a hymn...</em>';
+        refs.nextSlide.innerHTML = '';
+        refs.thumbnails.innerHTML = '';
+        refs.prevBtn.disabled = true;
+        refs.nextBtn.disabled = true;
+        refs.presentBtn.disabled = true;
+      }
     } else {
       state.selectedIndex = null;
     }
@@ -239,10 +264,10 @@
         type: 'init',
         slides: state.slides,
         currentIndex: state.currentIndex,
+        settings: appSettings,
       }, '*');
     };
     popup.onload = sendInit;
-    setTimeout(sendInit, 300);
     popup.addEventListener('beforeunload', () => {
       state.presentationWindow = null;
       setPresenterState(false);
@@ -255,13 +280,38 @@
     monitorPresenterWindow();
   };
 
+  let appSettings = {};
+
   const handleMessage = (event) => {
     const data = event.data || {};
+    if (data.type === 'settingsUpdate') {
+      appSettings = data.settings || {};
+      applyHymnsSettings();
+      return;
+    }
     if (data.type === 'navigateFromPopup') {
-      state.currentIndex = data.currentIndex;
-      renderSlides();
+      const idx = Number(data.currentIndex);
+      if (Number.isFinite(idx) && idx >= 0 && idx < state.slides.length) {
+        state.currentIndex = idx;
+        renderSlides();
+      }
     }
   };
+
+  function applyHymnsSettings() {
+    if (appSettings.projectionFont && appSettings.projectionFont !== 'system-ui') {
+      const fontMap = {
+        'Inter, sans-serif': 'Inter, sans-serif',
+        'Georgia, serif': 'Georgia, serif',
+        "'Times New Roman', serif": "'Times New Roman', serif",
+      };
+      const mapped = fontMap[appSettings.projectionFont] || appSettings.projectionFont;
+      document.documentElement.style.setProperty('--font-main', mapped);
+    }
+    document.querySelectorAll('.verse-label').forEach((el) => {
+      el.style.display = appSettings.showChorusLabels === false ? 'none' : '';
+    });
+  }
 
   const parseStanzas = (raw) => {
     if (!raw.trim()) return [];
@@ -292,6 +342,10 @@
 
   const addHymnFromModal = async (e) => {
     e.preventDefault();
+    if (!isInitialized) {
+      alert('Still loading hymns. Please wait.');
+      return;
+    }
     const title = (refs.modalTitle.value || '').trim();
     if (!title) {
       alert('Title is required.');
@@ -342,7 +396,7 @@
       document.body.appendChild(a);
       a.click();
       document.body.removeChild(a);
-      URL.revokeObjectURL(url);
+      setTimeout(() => URL.revokeObjectURL(url), 1000);
     } catch (e) {
       console.error(e);
       setStatus('Could not generate hymns.json download.', true);
@@ -421,10 +475,12 @@
       renderList();
       setStatus('Select a hymn to begin.');
       updateDeleteState();
+      isInitialized = true;
     } catch (err) {
       console.error(err);
       setStatus('Could not load hymns.json.', true);
       refs.search.disabled = true;
+      if (refs.addHymnBtn) refs.addHymnBtn.disabled = true;
     }
   };
 
@@ -538,6 +594,13 @@
   document.addEventListener('keydown', (e) => {
     const isInput = ['INPUT', 'TEXTAREA'].includes(e.target.tagName);
     if (isInput) return;
+    const modalOpen = refs.addModal && !refs.addModal.hidden;
+    if (modalOpen) {
+      if (e.key === 'Escape') {
+        closeModal();
+      }
+      return;
+    }
     if (e.key === 'ArrowLeft') {
       e.preventDefault();
       navigate(-1);

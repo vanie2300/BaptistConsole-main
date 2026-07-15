@@ -769,6 +769,16 @@ select:disabled {
   border-color: var(--highlight);
 }
 
+/* Settings overrides */
+
+.hide-verse-numbers .verse-row-number {
+  display: none;
+}
+
+.no-highlight-verse .verse-row.active {
+  border-color: transparent;
+}
+
 /* ===========================
    RESPONSIVE
    =========================== */

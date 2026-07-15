@@ -17,6 +17,7 @@ let lastSearchQuery = "";
 
 let presentWindow = null;
 let presenterStatusTimer = null;
+let presenterWindowId = 0;
 const PRESENTER_BIAS_DEFAULT = 1.3;
 let presenterFitBias = PRESENTER_BIAS_DEFAULT;
 let presenterAutoDisplayId = null;
@@ -172,8 +173,45 @@ function wireEvents() {
   });
 
   window.addEventListener("resize", () => {
-    autoFitCenterText(centerFontSizePx);
+    if (window._resizeTimer) cancelAnimationFrame(window._resizeTimer);
+    window._resizeTimer = requestAnimationFrame(() => {
+      autoFitCenterText(centerFontSizePx);
+    });
   });
+}
+
+// ======== SETTINGS FROM SHELL ========
+
+let appSettings = {};
+
+window.addEventListener("message", (evt) => {
+  if (!evt.data || evt.data.type !== "settingsUpdate") return;
+  appSettings = evt.data.settings || {};
+  applyBibleSettings();
+});
+
+function applyBibleSettings() {
+  const versesList = els.versesList;
+  if (versesList) {
+    // Show/hide verse numbers
+    versesList.classList.toggle("hide-verse-numbers", appSettings.showVerseNumbers === false);
+    // Highlight active verse
+    versesList.classList.toggle("no-highlight-verse", appSettings.highlightVerse === false);
+  }
+  // Bible font size → update presenter font size
+  if (appSettings.bibleFontSize) {
+    presenterFontSizePx = appSettings.bibleFontSize;
+  }
+  // Projection font
+  if (appSettings.projectionFont && appSettings.projectionFont !== "system-ui") {
+    const fontMap = {
+      "Inter, sans-serif": "Inter, sans-serif",
+      "Georgia, serif": "Georgia, serif",
+      "'Times New Roman', serif": "'Times New Roman', serif",
+    };
+    const mapped = fontMap[appSettings.projectionFont] || appSettings.projectionFont;
+    document.documentElement.style.setProperty("--font-main", mapped);
+  }
 }
 
 function openSearchDropdown() {
@@ -225,7 +263,9 @@ function initPreviewToggle() {
 
 function onPreviewToggleChange() {
   previewOnSelect = Boolean(els.previewToggle?.checked);
-  localStorage.setItem("biblePreviewOnSelect", String(previewOnSelect));
+  try {
+    localStorage.setItem("biblePreviewOnSelect", String(previewOnSelect));
+  } catch (e) {}
   if (previewOnSelect && isPresenterOpen()) {
     const location = getCurrentLocation();
     if (location) {
@@ -562,6 +602,7 @@ function renderChapterVerses(bookSlug, chapter) {
   }
 
   highlightCurrentVerseRow(false);
+  applyBibleSettings();
 }
 
 function renderSearchResults(list) {
@@ -600,6 +641,7 @@ function renderSearchResults(list) {
 
     els.versesList.appendChild(row);
   }
+  applyBibleSettings();
 }
 
 function appendHighlightedText(container, text, query) {
@@ -804,7 +846,9 @@ function getRecentSearches() {
 }
 
 function saveRecentSearches(list) {
-  localStorage.setItem(RECENT_SEARCH_KEY, JSON.stringify(list));
+  try {
+    localStorage.setItem(RECENT_SEARCH_KEY, JSON.stringify(list));
+  } catch (e) {}
 }
 
 function addRecentSearch(item) {
@@ -854,7 +898,7 @@ function goToReference(refString) {
   const bookSlug = normalizeBookName(rawBook);
 
   if (!bookMeta[bookSlug]) return false;
-  if (!bible[bookSlug][chapter] || !bible[bookSlug][chapter][verse]) return false;
+  if (!bible[bookSlug] || !bible[bookSlug][chapter] || !bible[bookSlug][chapter][verse]) return false;
 
   goToVerse(bookSlug, chapter, verse, true);
   return true;
@@ -943,6 +987,10 @@ function setupSearchSuggestions() {
 // ======== VERSE NAV HELPERS ========
 
 function goToVerse(bookSlug, chapter, verse, forcePreview = false) {
+  if (!bible[bookSlug] || !bible[bookSlug][chapter] || !bible[bookSlug][chapter][verse]) {
+    return;
+  }
+
   currentBook = bookSlug;
   currentChapter = chapter;
   currentVerse = verse;
@@ -1442,12 +1490,15 @@ function openPresenterWindow() {
   presentWindow.document.open();
   presentWindow.document.write(html);
   presentWindow.document.close();
+  const myWindowId = ++presenterWindowId;
   presentWindow.addEventListener("beforeunload", () => {
-    presentWindow = null;
-    setPresenterState(false);
-    if (presenterStatusTimer) {
-      clearInterval(presenterStatusTimer);
-      presenterStatusTimer = null;
+    if (presenterWindowId === myWindowId) {
+      presentWindow = null;
+      setPresenterState(false);
+      if (presenterStatusTimer) {
+        clearInterval(presenterStatusTimer);
+        presenterStatusTimer = null;
+      }
     }
   });
   setPresenterState(true);
@@ -1476,7 +1527,9 @@ function saveLastLocation() {
     chapter: currentChapter,
     verse: currentVerse,
   };
-  localStorage.setItem("bibleLastLocation", JSON.stringify(data));
+  try {
+    localStorage.setItem("bibleLastLocation", JSON.stringify(data));
+  } catch (e) {}
 }
 
 function restoreLastLocation() {

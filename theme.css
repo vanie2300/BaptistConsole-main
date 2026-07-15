@@ -147,3 +147,16 @@ li {
 ::-webkit-scrollbar-thumb:hover {
   background: var(--primary);
 }
+
+/* ═══════════════════════════════════════
+   ANIMATIONS TOGGLE
+   ═══════════════════════════════════════ */
+
+body.no-animations,
+body.no-animations *,
+body.no-animations *::before,
+body.no-animations *::after {
+  transition-duration: 0s !important;
+  animation-duration: 0s !important;
+  animation-delay: 0s !important;
+}

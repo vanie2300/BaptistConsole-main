@@ -13,6 +13,13 @@ function getHymnsPath() {
   return path.join(process.resourcesPath, 'hymns', 'hymns.json');
 }
 
+function ensureHymnsDir() {
+  const dir = path.dirname(getHymnsPath());
+  if (!fs.existsSync(dir)) {
+    fs.mkdirSync(dir, { recursive: true });
+  }
+}
+
 // ── IPC Handlers ──
 
 ipcMain.handle('get-displays', () => {
@@ -26,7 +33,16 @@ ipcMain.handle('get-displays', () => {
 });
 
 ipcMain.on('set-presenter-display', (_event, id) => {
-  presenterDisplayId = id;
+  if (id === null || id === undefined) {
+    presenterDisplayId = null;
+  } else if (typeof id === 'number' && Number.isInteger(id)) {
+    presenterDisplayId = id;
+  } else if (typeof id === 'string') {
+    const parsed = Number(id);
+    if (Number.isInteger(parsed)) {
+      presenterDisplayId = parsed;
+    }
+  }
 });
 
 ipcMain.handle('get-hymns', async () => {
@@ -41,6 +57,10 @@ ipcMain.handle('get-hymns', async () => {
 
 ipcMain.handle('save-hymns', async (_event, hymns) => {
   try {
+    if (!Array.isArray(hymns)) {
+      return { ok: false, error: 'Invalid hymns data: expected an array' };
+    }
+    ensureHymnsDir();
     const filePath = getHymnsPath();
     await fs.promises.writeFile(filePath, JSON.stringify(hymns, null, 2), 'utf-8');
     return { ok: true };
@@ -75,7 +95,7 @@ function createMainWindow() {
     minWidth: 800,
     minHeight: 500,
     title: 'Baptist Console',
-    icon: path.join(__dirname, 'icon.png'),
+    icon: fs.existsSync(path.join(__dirname, 'icon.png')) ? path.join(__dirname, 'icon.png') : undefined,
     backgroundColor: '#0e0e0e',
     titleBarStyle: 'hidden',
     webPreferences: {
@@ -89,7 +109,9 @@ function createMainWindow() {
   mainWindow.loadFile('index.html');
 
   mainWindow.webContents.setWindowOpenHandler(({ url }) => {
-    if (url === 'presentation.html' || url === '' || url === 'about:blank') {
+    const isPresentation = url.includes('presentation.html');
+    const isEmpty = url === '' || url === 'about:blank';
+    if (isPresentation || isEmpty) {
       return {
         action: 'allow',
         overrideBrowserWindowOptions: {
@@ -127,4 +149,30 @@ app.whenReady().then(() => {
 
 app.on('window-all-closed', () => {
   app.quit();
+});
+
+ipcMain.on('window-minimize', () => {
+  if (mainWindow && !mainWindow.isDestroyed()) mainWindow.minimize();
+});
+
+ipcMain.on('window-maximize', () => {
+  if (mainWindow && !mainWindow.isDestroyed()) {
+    if (mainWindow.isMaximized()) {
+      mainWindow.unmaximize();
+    } else {
+      mainWindow.maximize();
+    }
+  }
+});
+
+ipcMain.on('window-close', () => {
+  if (mainWindow && !mainWindow.isDestroyed()) mainWindow.close();
+});
+
+app.on('render-process-gone', (_event, win, details) => {
+  console.error('Renderer process gone:', details.reason);
+});
+
+process.on('uncaughtException', (err) => {
+  console.error('Uncaught exception:', err);
 });

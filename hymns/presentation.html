@@ -120,24 +120,26 @@ function escapeHtml(text) {
 function renderSlide() {
     const slide = slides[currentIndex] || { lines: ['End of hymn'] };
     const container = document.getElementById('slideContent');
+    const fontScale = (slideSettings.hymnFontSize || 48) / 48;
     if (slide.type === 'title') {
         container.classList.add('centered');
         container.innerHTML = `
             <div class="slide-title" id="autoFitTarget">${escapeHtml(slide.title)}</div>
         `;
-        autoFitText(document.getElementById('autoFitTarget'), 7, 2);
+        autoFitText(document.getElementById('autoFitTarget'), 7 * fontScale, 2);
     } else {
         container.classList.remove('centered');
-        const label = slide.type === 'chorus' ? 'Chorus' : 'Verse ' + slide.number;
+        const label = (slideSettings.showChorusLabels === false && slide.type === 'chorus') ? '' :
+            (slide.type === 'chorus' ? 'Chorus' : 'Verse ' + slide.number);
         const content = (slide.lines || []).map(escapeHtml).join('<br>');
         container.innerHTML = `
-            <div class="slide-label" id="autoFitLabel">${label}</div>
+            ${label ? `<div class="slide-label" id="autoFitLabel">${label}</div>` : ''}
             <div class="slide-lyrics" id="autoFitLyrics">${content}</div>
         `;
-        autoFitText(document.getElementById('autoFitLyrics'), 6.5, 4);
-        autoFitText(document.getElementById('autoFitLabel'), 3, 1.2);
+        autoFitText(document.getElementById('autoFitLyrics'), 6.5 * fontScale, 4);
+        const labelEl = document.getElementById('autoFitLabel');
+        if (labelEl) autoFitText(labelEl, 3 * fontScale, 1.2);
     }
-    // Auto-fit text in the container
     autoFitText(container);
 }
 
@@ -145,24 +147,55 @@ function autoFitText(container, maxFont = 8, minFont = 4) {
     // Try to fit the text by shrinking font-size (in vw) until it fits or hits minFont
     let fontSize = maxFont;
     container.style.fontSize = fontSize + 'vw';
-    // Use a timeout to ensure rendering is complete
-    setTimeout(() => {
-        while ((container.scrollHeight > container.parentElement.clientHeight || container.scrollWidth > container.parentElement.clientWidth) && fontSize > minFont) {
+    requestAnimationFrame(() => {
+        const parent = container.parentElement;
+        if (!parent) return;
+        while ((container.scrollHeight > parent.clientHeight || container.scrollWidth > parent.clientWidth) && fontSize > minFont) {
             fontSize -= 0.2;
             container.style.fontSize = fontSize + 'vw';
         }
-    }, 0);
+    });
 }
 
 // Listen for messages from the main window
+let slideSettings = {};
+function applyPresentationSettings() {
+    if (slideSettings.projectionFont && slideSettings.projectionFont !== 'system-ui') {
+        const fontMap = {
+            'Inter, sans-serif': 'Inter, sans-serif',
+            'Georgia, serif': 'Georgia, serif',
+            "'Times New Roman', serif": "'Times New Roman', serif",
+        };
+        const mapped = fontMap[slideSettings.projectionFont] || slideSettings.projectionFont;
+        document.documentElement.style.setProperty('--font-main', mapped);
+    }
+    if (slideSettings.showChorusLabels === false) {
+        document.querySelectorAll('.slide-label').forEach(el => { el.style.display = 'none'; });
+    }
+    renderSlide();
+}
+
 window.addEventListener('message', function(e) {
+    if (e.source !== window.opener) return;
+    if (e.data && e.data.type === 'settingsUpdate') {
+        slideSettings = e.data.settings || {};
+        applyPresentationSettings();
+        return;
+    }
     if (e.data && e.data.type === 'init') {
-        slides = e.data.slides;
-        currentIndex = e.data.currentIndex;
-        renderSlide();
+        if (Array.isArray(e.data.slides)) {
+            slides = e.data.slides;
+            currentIndex = Number(e.data.currentIndex) || 0;
+            slideSettings = e.data.settings || {};
+            renderSlide();
+            applyPresentationSettings();
+        }
     } else if (e.data && e.data.type === 'navigate') {
-        currentIndex = e.data.currentIndex;
-        renderSlide();
+        const idx = Number(e.data.currentIndex);
+        if (Number.isFinite(idx) && idx >= 0 && idx < slides.length) {
+            currentIndex = idx;
+            renderSlide();
+        }
     }
 });
 
@@ -194,6 +227,11 @@ window.addEventListener('keydown', function(e) {
     } else if (e.key === 'Escape') {
         window.close();
     }
+});
+
+// Prevent unhandled errors from crashing the presentation
+window.addEventListener('error', function(e) {
+    console.error('Presentation error:', e.error);
 });
 </script>
 </body>
