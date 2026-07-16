@@ -4,33 +4,23 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Hymn Presenter</title>
-  <link rel="stylesheet" href="../theme.css?v=5">
-  <link rel="stylesheet" href="presenter.css?v=5">
+  <link rel="stylesheet" href="../theme.css">
+  <link rel="stylesheet" href="presenter.css">
   <script>
     (() => {
       const theme = localStorage.getItem('globalTheme');
-      if (theme === 'light') {
-        document.documentElement.classList.add('theme-light');
+      if (theme === 'dark') {
+        document.documentElement.classList.add('theme-dark');
       }
     })();
   </script>
 </head>
 <body>
-  <!-- UI GROUP: Window Bar -->
-  <div class="window-bar" data-ui="hymn-window-bar">
-    <div class="window-title">Hymn Console</div>
-    <div class="window-controls" data-ui="hymn-window-controls">
-      <button class="window-btn" data-window-action="minimize" aria-label="Minimize">—</button>
-      <button class="window-btn" data-window-action="maximize" aria-label="Maximize">□</button>
-      <button class="window-btn close" data-window-action="close" aria-label="Close">×</button>
-    </div>
-  </div>
   <div class="app-shell" data-ui="hymn-layout-shell">
     <!-- UI GROUP: Library Panel -->
     <aside class="panel panel-left" data-ui="hymn-library-panel">
       <header class="panel-header library-header" data-ui="hymn-library-header">
         <div class="library-top" data-ui="hymn-library-header-top">
-          <a class="back-link" href="../index.html">&#8592; Home</a>
           <div class="header-actions" data-ui="hymn-library-header-actions">
             <button class="link-action primary" id="addHymnBtn" data-ui="hymn-add-button">+ Add Hymn</button>
             <button class="link-action danger" id="deleteHymnBtn" data-ui="hymn-delete-button" disabled>Delete Hymn</button>
@@ -60,7 +50,7 @@
           <p class="muted">Select a hymn, navigate slides, and present.</p>
         </div>
           <div class="presenter-controls" data-ui="hymn-present-controls">
-            <div class="presenter-display" id="presenterDisplayWrap" data-ui="hymn-presenter-display-select">
+            <div class="presenter-display" id="presenterDisplayWrap" data-ui="hymn-presenter-display-select" hidden>
               <div class="presenter-pill" data-ui="hymn-presenter-display-pill">
                 <span class="presenter-label">Presenter</span>
                 <select id="presenterDisplayPicker" class="presenter-select">
@@ -110,23 +100,10 @@
       </form>
     </div>
   </div>
-  <script src="../theme.js?v=5"></script>
-  <script src="presenter.js?v=5"></script>
-  <script>
-    (() => {
-      if (window.self !== window.top) document.body.classList.add('in-iframe');
-      const controls = window.windowControls;
-      document.querySelectorAll('[data-window-action]').forEach((btn) => {
-        btn.addEventListener('click', () => {
-          if (!controls) return;
-          const action = btn.getAttribute('data-window-action');
-          if (action === 'minimize') controls.minimize();
-          if (action === 'maximize') controls.maximize();
-          if (action === 'close') controls.close();
-        });
-      });
-    })();
-  </script>
+  <script src="../theme.js"></script>
+  <script src="../presenter-proxy.js"></script>
+  <script src="presenter.js"></script>
+
 </body>
 </html>
 

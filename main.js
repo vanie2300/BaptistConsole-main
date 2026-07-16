@@ -1,4 +1,4 @@
-const { app, BrowserWindow, ipcMain, screen } = require('electron');
+const { app, BrowserWindow, ipcMain, screen, dialog } = require('electron');
 const path = require('path');
 const fs = require('fs');
 
@@ -69,6 +69,19 @@ ipcMain.handle('save-hymns', async (_event, hymns) => {
   }
 });
 
+ipcMain.handle('pick-background-image', async () => {
+  if (!mainWindow || mainWindow.isDestroyed()) return null;
+  const result = await dialog.showOpenDialog(mainWindow, {
+    title: 'Select Background Image',
+    filters: [
+      { name: 'Images', extensions: ['jpg', 'jpeg', 'png', 'gif', 'webp', 'bmp'] },
+    ],
+    properties: ['openFile'],
+  });
+  if (result.canceled || !result.filePaths.length) return null;
+  return result.filePaths[0];
+});
+
 // ── Move window to target display ──
 
 function moveWindowToDisplay(win) {
@@ -128,6 +141,7 @@ function createMainWindow() {
 
   mainWindow.webContents.on('did-create-window', (win) => {
     moveWindowToDisplay(win);
+    win.setFullScreen(true);
   });
 
   mainWindow.on('closed', () => {

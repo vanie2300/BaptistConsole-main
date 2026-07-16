@@ -4,26 +4,57 @@
 <meta charset="UTF-8">
 <title>Presentation</title>
 <meta name="viewport" content="width=1024, initial-scale=1.0">
-<link rel="stylesheet" href="../theme.css?v=5">
+<link rel="stylesheet" href="../theme.css">
 <script>
   (() => {
     const theme = localStorage.getItem('globalTheme');
-    if (theme === 'light') {
+    if (theme === 'dark') {
+      document.documentElement.classList.add('theme-dark');
+    } else if (theme === 'light') {
       document.documentElement.classList.add('theme-light');
+    }
+    const bg = localStorage.getItem('settings_presenterBg');
+    const text = localStorage.getItem('settings_presenterText');
+    const weight = localStorage.getItem('settings_presenterWeight');
+    const font = localStorage.getItem('settings_presenterFont');
+    if (bg) document.documentElement.style.setProperty('--present-bg', bg);
+    if (text) document.documentElement.style.setProperty('--present-text', text);
+    if (font) document.documentElement.style.setProperty('--present-font', font);
+    var bgImage = localStorage.getItem('settings_presenterBgImage');
+    var bgOpacity = localStorage.getItem('settings_presenterBgOpacity');
+    if (bgImage) {
+      var layer = document.getElementById('bgImageLayer');
+      if (layer) {
+        layer.style.backgroundImage = 'url("file:///' + bgImage.replace(/\\/g, '/').replace(/"/g, '\\"') + '")';
+        layer.style.opacity = String((Number(bgOpacity) || 30) / 100);
+        layer.style.display = 'block';
+      }
     }
   })();
 </script>
 <style>
 body {
     margin: 0;
-    background: var(--bg);
-    color: var(--text);
+    background: var(--present-bg, var(--bg));
+    color: var(--present-text, var(--text));
     width: 100vw;
     height: 100vh;
     overflow: hidden;
     display: flex;
     align-items: center;
     justify-content: center;
+    position: relative;
+    z-index: 1;
+    font-family: var(--present-font, 'Segoe UI', 'Arial', sans-serif);
+}
+#bgImageLayer {
+    position: fixed;
+    inset: 0;
+    background-size: cover;
+    background-position: center;
+    z-index: -1;
+    pointer-events: none;
+    display: none;
 }
 #slideContent {
     
@@ -34,7 +65,7 @@ body {
     padding: 2vw 3vw;
     text-align: left;
     overflow-y: hidden;
-    font-family: var(--font-main, 'Segoe UI', 'Arial', sans-serif);
+    font-family: var(--present-font, 'Segoe UI', 'Arial', sans-serif);
     border: none;
     gap: 2vw;
     font-weight: bold;
@@ -46,7 +77,7 @@ body {
     padding: 0;
     color: var(--primary);
     letter-spacing: 0.05em;
-    text-shadow: 0 2px 8px rgba(0, 0, 0, 0.4);
+    text-shadow: 0 2px 8px #000a;
 }
 .slide-title {
     font-weight: bold;
@@ -54,7 +85,7 @@ body {
     width: 100%;
  
     color: var(--text);
-    text-shadow: 0 2px 8px rgba(0, 0, 0, 0.4);
+    text-shadow: 0 2px 8px #000a;
    
     display: flex;
     justify-content: center;
@@ -64,7 +95,7 @@ body {
     font-size: 1vw;
     line-height: 1.18;
     color: var(--text);
-    text-shadow: 0 2px 8px rgba(0, 0, 0, 0.4);
+    text-shadow: 0 2px 8px #000a;
     width: 100%;
     word-break: break-word;
 }
@@ -82,8 +113,9 @@ body {
 </head>
 <body data-ui="hymn-presentation-body">
 <!-- UI GROUP: Presentation Stage -->
+<div id="bgImageLayer"></div>
 <div id="slideContent" data-ui="hymn-presentation-stage"><em>Waiting for slides...</em></div>
-<script src="../theme.js?v=5"></script>
+<script src="../theme.js"></script>
 <script>
 let slides = [];
 let currentIndex = 0;
@@ -120,86 +152,129 @@ function escapeHtml(text) {
 function renderSlide() {
     const slide = slides[currentIndex] || { lines: ['End of hymn'] };
     const container = document.getElementById('slideContent');
-    const fontScale = (slideSettings.hymnFontSize || 48) / 48;
+    const align = window._hymnAlign || localStorage.getItem('settings_hymnAlign') || 'left';
+    const layout = window._hymnLayout || localStorage.getItem('settings_hymnLayout') || 'full';
+    const showNumbers = window._hymnShowNumbers !== undefined ? window._hymnShowNumbers : (localStorage.getItem('settings_hymnShowNumbers') !== 'false');
+    const titleSize = window._hymnTitleSize || Number(localStorage.getItem('settings_hymnTitleSize')) || 7;
+
+    container.style.textAlign = align;
+    container.style.maxWidth = layout === 'compact' ? '70vw' : '100%';
+    container.style.padding = layout === 'compact' ? '4vw 10vw' : '2vw 3vw';
+
     if (slide.type === 'title') {
         container.classList.add('centered');
         container.innerHTML = `
-            <div class="slide-title" id="autoFitTarget">${escapeHtml(slide.title)}</div>
+            <div class="slide-title" id="autoFitTarget" style="font-size:${titleSize}vw">${escapeHtml(slide.title)}</div>
         `;
-        autoFitText(document.getElementById('autoFitTarget'), 7 * fontScale, 2);
+        autoFitText(document.getElementById('autoFitTarget'), titleSize, 2);
     } else {
         container.classList.remove('centered');
-        const label = (slideSettings.showChorusLabels === false && slide.type === 'chorus') ? '' :
-            (slide.type === 'chorus' ? 'Chorus' : 'Verse ' + slide.number);
+        const label = slide.type === 'chorus' ? 'Chorus' : 'Verse ' + slide.number;
         const content = (slide.lines || []).map(escapeHtml).join('<br>');
-        container.innerHTML = `
-            ${label ? `<div class="slide-label" id="autoFitLabel">${label}</div>` : ''}
-            <div class="slide-lyrics" id="autoFitLyrics">${content}</div>
-        `;
-        autoFitText(document.getElementById('autoFitLyrics'), 6.5 * fontScale, 4);
-        const labelEl = document.getElementById('autoFitLabel');
-        if (labelEl) autoFitText(labelEl, 3 * fontScale, 1.2);
+        if (showNumbers) {
+            container.innerHTML = `
+                <div class="slide-label" id="autoFitLabel">${label}</div>
+                <div class="slide-lyrics" id="autoFitLyrics">${content}</div>
+            `;
+            autoFitText(document.getElementById('autoFitLyrics'), 6.5, 4);
+            autoFitText(document.getElementById('autoFitLabel'), 3, 1.2);
+        } else {
+            container.innerHTML = `
+                <div class="slide-lyrics" id="autoFitLyrics">${content}</div>
+            `;
+            autoFitText(document.getElementById('autoFitLyrics'), 7, 4);
+        }
     }
     autoFitText(container);
+}
+
+function applyPresenterSettings() {
+    const root = document.documentElement;
+    const bg = localStorage.getItem('settings_presenterBg');
+    const text = localStorage.getItem('settings_presenterText');
+    const weight = localStorage.getItem('settings_presenterWeight');
+    const font = localStorage.getItem('settings_presenterFont');
+    const bgImage = localStorage.getItem('settings_presenterBgImage');
+    const bgOpacity = localStorage.getItem('settings_presenterBgOpacity');
+
+    if (bg) root.style.setProperty('--present-bg', bg);
+    if (text) root.style.setProperty('--present-text', text);
+    if (font) root.style.setProperty('--present-font', font);
+
+    var bgLayer = document.getElementById('bgImageLayer');
+    if (bgLayer) {
+        if (bgImage) {
+            bgLayer.style.backgroundImage = 'url("file:///' + bgImage.replace(/\\/g, '/').replace(/"/g, '\\"') + '")';
+            bgLayer.style.opacity = String((Number(bgOpacity) || 30) / 100);
+            bgLayer.style.display = 'block';
+        } else {
+            bgLayer.style.display = 'none';
+        }
+    }
+
+    // Apply weight to lyric/label elements
+    document.querySelectorAll('.slide-lyrics, .slide-label').forEach((el) => {
+        if (weight) el.style.fontWeight = weight;
+    });
+    renderSlide();
+}
+
+function applyThemeFromStorage() {
+    const theme = localStorage.getItem('globalTheme');
+    document.documentElement.classList.toggle('theme-dark', theme === 'dark');
+    document.documentElement.classList.toggle('theme-light', theme === 'light');
 }
 
 function autoFitText(container, maxFont = 8, minFont = 4) {
     // Try to fit the text by shrinking font-size (in vw) until it fits or hits minFont
     let fontSize = maxFont;
     container.style.fontSize = fontSize + 'vw';
-    requestAnimationFrame(() => {
-        const parent = container.parentElement;
-        if (!parent) return;
-        while ((container.scrollHeight > parent.clientHeight || container.scrollWidth > parent.clientWidth) && fontSize > minFont) {
+    // Use a timeout to ensure rendering is complete
+    setTimeout(() => {
+        while ((container.scrollHeight > container.parentElement.clientHeight || container.scrollWidth > container.parentElement.clientWidth) && fontSize > minFont) {
             fontSize -= 0.2;
             container.style.fontSize = fontSize + 'vw';
         }
-    });
+    }, 0);
 }
 
 // Listen for messages from the main window
-let slideSettings = {};
-function applyPresentationSettings() {
-    if (slideSettings.projectionFont && slideSettings.projectionFont !== 'system-ui') {
-        const fontMap = {
-            'Inter, sans-serif': 'Inter, sans-serif',
-            'Georgia, serif': 'Georgia, serif',
-            "'Times New Roman', serif": "'Times New Roman', serif",
-        };
-        const mapped = fontMap[slideSettings.projectionFont] || slideSettings.projectionFont;
-        document.documentElement.style.setProperty('--font-main', mapped);
-    }
-    if (slideSettings.showChorusLabels === false) {
-        document.querySelectorAll('.slide-label').forEach(el => { el.style.display = 'none'; });
-    }
-    renderSlide();
-}
-
 window.addEventListener('message', function(e) {
-    if (e.source !== window.opener) return;
-    if (e.data && e.data.type === 'settingsUpdate') {
-        slideSettings = e.data.settings || {};
-        applyPresentationSettings();
-        return;
-    }
     if (e.data && e.data.type === 'init') {
-        if (Array.isArray(e.data.slides)) {
-            slides = e.data.slides;
-            currentIndex = Number(e.data.currentIndex) || 0;
-            slideSettings = e.data.settings || {};
-            renderSlide();
-            applyPresentationSettings();
-        }
+        slides = e.data.slides;
+        currentIndex = e.data.currentIndex;
+        renderSlide();
     } else if (e.data && e.data.type === 'navigate') {
-        const idx = Number(e.data.currentIndex);
-        if (Number.isFinite(idx) && idx >= 0 && idx < slides.length) {
-            currentIndex = idx;
-            renderSlide();
+        currentIndex = e.data.currentIndex;
+        renderSlide();
+    } else if (e.data && e.data.type === 'settingsUpdate') {
+        const root = document.documentElement;
+        if (e.data.bg) root.style.setProperty('--present-bg', e.data.bg);
+        if (e.data.text) root.style.setProperty('--present-text', e.data.text);
+        if (e.data.font) root.style.setProperty('--present-font', e.data.font);
+        var bgLayer = document.getElementById('bgImageLayer');
+        if (bgLayer) {
+            if (e.data.bgImage) {
+                bgLayer.style.backgroundImage = 'url("file:///' + e.data.bgImage.replace(/\\/g, '/').replace(/"/g, '\\"') + '")';
+                bgLayer.style.opacity = String((e.data.bgOpacity || 30) / 100);
+                bgLayer.style.display = 'block';
+            } else {
+                bgLayer.style.display = 'none';
+            }
         }
+        renderSlide();
+    } else if (e.data && e.data.type === 'hymnSettingsUpdate') {
+        if (e.data.align) window._hymnAlign = e.data.align;
+        if (e.data.layout) window._hymnLayout = e.data.layout;
+        if (typeof e.data.showNumbers === 'boolean') window._hymnShowNumbers = e.data.showNumbers;
+        if (typeof e.data.titleSize === 'number') window._hymnTitleSize = e.data.titleSize;
+        renderSlide();
     }
 });
 
 window.addEventListener('load', function() {
+    applyThemeFromStorage();
+    applyPresenterSettings();
     maximizeWindow();
     requestFullscreenSafe();
 });
@@ -227,11 +302,6 @@ window.addEventListener('keydown', function(e) {
     } else if (e.key === 'Escape') {
         window.close();
     }
-});
-
-// Prevent unhandled errors from crashing the presentation
-window.addEventListener('error', function(e) {
-    console.error('Presentation error:', e.error);
 });
 </script>
 </body>

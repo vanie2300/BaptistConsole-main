@@ -48,531 +48,760 @@
     tab.addEventListener('click', () => switchTab(tab.dataset.tab));
   });
 
-  // Initialize indicator position
   requestAnimationFrame(() => {
     moveIndicator(document.querySelector('.tab.active'));
   });
 
-  // ── Settings Modal ──
-  const settingsBtn = document.getElementById('settingsBtn');
-  const overlay = document.getElementById('settingsOverlay');
-  const closeBtn = document.getElementById('settingsClose');
-  const cancelBtn = document.getElementById('settingsCancel');
-  const saveBtn = document.getElementById('settingsSave');
-  const resetBtn = document.getElementById('settingsReset');
-  const sidebar = document.getElementById('settingsSidebar');
-  const content = document.getElementById('settingsContent');
-
-  // Settings state
-  const DEFAULTS = {
-    _v: 5,
-    theme: 'dark',
-    accent: 'blue',
-    density: 'comfortable',
-    animations: true,
-    font: 'Inter',
-    corners: 'medium',
-    aspectRatio: '16:9',
-    presentationBg: 'solid',
-    bgColor: '#000000',
-    autoFullscreen: false,
-    autoOpenPopup: true,
-    screenTransition: 'fade',
-    rememberState: true,
-    bibleDefaultBook: '',
-    showVerseNumbers: true,
-    highlightVerse: true,
-    rememberLastPassage: true,
-    autoScroll: true,
-    bibleFontSize: 220,
-    projectionFont: 'system-ui',
-    rememberLastHymn: true,
-    hymnFontSize: 48,
-    autoSplitStanzas: true,
-    showChorusLabels: true,
-    hymnDefaultSort: 'number',
-  };
-
-  let settings = { ...DEFAULTS };
-  let settingsBackup = null;
-
-  // Load settings from localStorage
-  function loadSettings() {
-    try {
-      const stored = localStorage.getItem('baptistSettings');
-      if (stored) {
-        const parsed = JSON.parse(stored);
-        if (parsed._v === DEFAULTS._v) {
-          settings = { ...DEFAULTS, ...parsed };
-        } else {
-          const preserved = {};
-          for (const key of Object.keys(DEFAULTS)) {
-            if (key in parsed && key !== '_v') {
-              preserved[key] = parsed[key];
-            }
-          }
-          settings = { ...DEFAULTS, ...preserved };
-          saveSettings();
-        }
-      }
-    } catch (e) {
-      console.warn('Failed to load settings, using defaults');
-    }
-  }
-
-  function saveSettings() {
-    try {
-      localStorage.setItem('baptistSettings', JSON.stringify(settings));
-    } catch (e) {
-      console.error('Failed to save settings:', e);
-    }
-  }
-
-  // ── Settings UI Panels ──
-  const ACCENT_COLORS = {
-    blue: '#4169E1',
-    purple: '#7b5aad',
-    green: '#4a9b72',
-    red: '#b55454',
-    orange: '#b87a48',
-    teal: '#4a9b92',
-  };
-
-  const FONT_OPTIONS = ['Inter', 'Roboto', 'Poppins'];
-  const DENSITY_OPTIONS = ['comfortable', 'compact'];
-  const CORNER_OPTIONS = ['small', 'medium', 'large'];
-  const ASPECT_OPTIONS = ['16:9', '4:3'];
-  const BG_OPTIONS = ['solid', 'gradient', 'image'];
-  const TRANSITION_OPTIONS = ['instant', 'fade', 'slide'];
-  const SORT_OPTIONS = ['number', 'title'];
-
-  function renderRadioGroup(name, options, current) {
-    return `<div class="radio-group">
-      ${options.map((o) =>
-        `<button class="radio-btn${o === current ? ' active' : ''}" data-setting="${name}" data-value="${o}">${o}</button>`
-      ).join('')}
-    </div>`;
-  }
-
-  function renderSwatches(name, colors, current) {
-    return `<div class="swatch-group">
-      ${Object.entries(colors).map(([key, hex]) =>
-        `<button class="swatch${key === current ? ' active' : ''}" data-setting="${name}" data-value="${key}" style="background:${hex}" title="${key}"></button>`
-      ).join('')}
-    </div>`;
-  }
-
-  function renderToggle(name, current) {
-    return `<button class="toggle${current ? ' active' : ''}" data-setting="${name}" data-type="toggle" role="switch" aria-checked="${current}" aria-label="${name}"></button>`;
-  }
-
-  function getPanel(catId) {
-    const panels = {
-      appearance: `
-        <div class="settings-section">
-          <div class="settings-section-title">Appearance</div>
-          <div class="settings-row">
-            <span class="settings-label">Theme</span>
-            ${renderRadioGroup('theme', ['light', 'dark'], settings.theme)}
-          </div>
-          <div class="settings-row">
-            <span class="settings-label">Accent Color</span>
-            ${renderSwatches('accent', ACCENT_COLORS, settings.accent)}
-          </div>
-          <div class="settings-row">
-            <span class="settings-label">UI Density</span>
-            ${renderRadioGroup('density', DENSITY_OPTIONS, settings.density)}
-          </div>
-          <div class="settings-row">
-            <span class="settings-label">Animations</span>
-            ${renderToggle('animations', settings.animations)}
-          </div>
-          <div class="settings-row">
-            <span class="settings-label">Interface Font</span>
-            ${renderRadioGroup('font', FONT_OPTIONS, settings.font)}
-          </div>
-          <div class="settings-row">
-            <span class="settings-label">Rounded Corners</span>
-            ${renderRadioGroup('corners', CORNER_OPTIONS, settings.corners)}
-          </div>
-        </div>
-      `,
-      presentation: `
-        <div class="settings-section">
-          <div class="settings-section-title">Presentation</div>
-          <div class="settings-row">
-            <span class="settings-label">Default Aspect Ratio</span>
-            ${renderRadioGroup('aspectRatio', ASPECT_OPTIONS, settings.aspectRatio)}
-          </div>
-          <div class="settings-row">
-            <span class="settings-label">Default Background</span>
-            ${renderRadioGroup('presentationBg', BG_OPTIONS, settings.presentationBg)}
-          </div>
-          <div class="settings-row">
-            <span class="settings-label">Auto Fullscreen</span>
-            ${renderToggle('autoFullscreen', settings.autoFullscreen)}
-          </div>
-          <div class="settings-row">
-            <span class="settings-label">Auto Open Presentation Window</span>
-            ${renderToggle('autoOpenPopup', settings.autoOpenPopup)}
-          </div>
-          <div class="settings-row">
-            <span class="settings-label">Screen Transition</span>
-            ${renderRadioGroup('screenTransition', TRANSITION_OPTIONS, settings.screenTransition)}
-          </div>
-          <div class="settings-row">
-            <span class="settings-label">Remember Presentation State</span>
-            ${renderToggle('rememberState', settings.rememberState)}
-          </div>
-        </div>
-      `,
-      bible: `
-        <div class="settings-section">
-          <div class="settings-section-title">Bible</div>
-          <div class="settings-row">
-            <span class="settings-label">Show Verse Numbers</span>
-            ${renderToggle('showVerseNumbers', settings.showVerseNumbers)}
-          </div>
-          <div class="settings-row">
-            <span class="settings-label">Highlight Current Verse</span>
-            ${renderToggle('highlightVerse', settings.highlightVerse)}
-          </div>
-          <div class="settings-row">
-            <span class="settings-label">Remember Last Passage</span>
-            ${renderToggle('rememberLastPassage', settings.rememberLastPassage)}
-          </div>
-          <div class="settings-row">
-            <span class="settings-label">Auto Scroll</span>
-            ${renderToggle('autoScroll', settings.autoScroll)}
-          </div>
-          <div class="settings-row">
-            <span class="settings-label">Projection Font Size</span>
-            <div class="settings-control">
-              <input type="number" id="bibleFontSize" value="${settings.bibleFontSize}" min="36" max="800" step="10">
-            </div>
-          </div>
-          <div class="settings-row">
-            <span class="settings-label">Projection Font</span>
-            <div class="settings-control">
-              <select id="projectionFont">
-                <option value="system-ui"${settings.projectionFont === 'system-ui' ? ' selected' : ''}>System Default</option>
-                <option value="Inter, sans-serif"${settings.projectionFont === 'Inter, sans-serif' ? ' selected' : ''}>Inter</option>
-                <option value="Georgia, serif"${settings.projectionFont === 'Georgia, serif' ? ' selected' : ''}>Georgia</option>
-                <option value="'Times New Roman', serif"${settings.projectionFont === "'Times New Roman', serif" ? ' selected' : ''}>Times New Roman</option>
-              </select>
-            </div>
-          </div>
-        </div>
-      `,
-      hymns: `
-        <div class="settings-section">
-          <div class="settings-section-title">Hymns</div>
-          <div class="settings-row">
-            <span class="settings-label">Remember Last Hymn</span>
-            ${renderToggle('rememberLastHymn', settings.rememberLastHymn)}
-          </div>
-          <div class="settings-row">
-            <span class="settings-label">Projection Font Size</span>
-            <div class="settings-control">
-              <input type="number" id="hymnFontSize" value="${settings.hymnFontSize}" min="24" max="120" step="4">
-            </div>
-          </div>
-          <div class="settings-row">
-            <span class="settings-label">Auto Split Stanzas</span>
-            ${renderToggle('autoSplitStanzas', settings.autoSplitStanzas)}
-          </div>
-          <div class="settings-row">
-            <span class="settings-label">Show Chorus Labels</span>
-            ${renderToggle('showChorusLabels', settings.showChorusLabels)}
-          </div>
-          <div class="settings-row">
-            <span class="settings-label">Default Sort</span>
-            ${renderRadioGroup('hymnDefaultSort', SORT_OPTIONS, settings.hymnDefaultSort)}
-          </div>
-        </div>
-      `,
-      advanced: `
-        <div class="settings-section">
-          <div class="settings-section-title">Advanced</div>
-          <div class="settings-row">
-            <span class="settings-label">Export Configuration</span>
-            <button class="settings-btn secondary" id="exportConfig">Export</button>
-          </div>
-          <div class="settings-row">
-            <span class="settings-label">Import Configuration</span>
-            <button class="settings-btn secondary" id="importConfig">Import</button>
-            <input type="file" id="importFile" accept=".json" hidden>
-          </div>
-          <div class="settings-row">
-            <span class="settings-label">Reset All Settings</span>
-            <button class="settings-btn secondary" id="resetAllSettings" style="color:var(--text-muted)">Reset</button>
-          </div>
-          <div class="settings-row" style="margin-top:16px;">
-            <div>
-              <div class="settings-label" style="margin-bottom:4px;">Baptist Console</div>
-              <div style="font-size:0.75rem;color:var(--text-muted)">Version 1.0.0-dev</div>
-              <div style="font-size:0.75rem;color:var(--text-muted)">Created by Jovanie Cangke</div>
-            </div>
-          </div>
-        </div>
-      `,
-    };
-    return panels[catId] || '';
-  }
-
-  function showPanel(catId) {
-    content.innerHTML = getPanel(catId);
-    wirePanelEvents();
-  }
-
-  function wirePanelEvents() {
-    // Radio buttons
-    content.querySelectorAll('.radio-btn').forEach((btn) => {
-      btn.addEventListener('click', () => {
-        const group = btn.closest('.radio-group');
-        group.querySelectorAll('.radio-btn').forEach((b) => b.classList.remove('active'));
-        btn.classList.add('active');
-        settings[btn.dataset.setting] = btn.dataset.value;
-        applySettingLive(btn.dataset.setting, btn.dataset.value);
-      });
-    });
-
-    // Swatches
-    content.querySelectorAll('.swatch').forEach((sw) => {
-      sw.addEventListener('click', () => {
-        sw.closest('.swatch-group').querySelectorAll('.swatch').forEach((s) => s.classList.remove('active'));
-        sw.classList.add('active');
-        settings[sw.dataset.setting] = sw.dataset.value;
-        applySettingLive(sw.dataset.setting, sw.dataset.value);
-      });
-    });
-
-    // Toggles
-    content.querySelectorAll('.toggle').forEach((tg) => {
-      tg.addEventListener('click', () => {
-        tg.classList.toggle('active');
-        const val = tg.classList.contains('active');
-        settings[tg.dataset.setting] = val;
-        applySettingLive(tg.dataset.setting, val);
-      });
-    });
-
-    // Number inputs
-    content.querySelectorAll('input[type="number"]').forEach((inp) => {
-      inp.addEventListener('change', () => {
-        const num = Number(inp.value);
-        if (Number.isFinite(num)) {
-          const min = inp.hasAttribute('min') ? Number(inp.min) : -Infinity;
-          const max = inp.hasAttribute('max') ? Number(inp.max) : Infinity;
-          settings[inp.id] = Math.min(max, Math.max(min, num));
-        }
-      });
-    });
-
-    // Selects
-    content.querySelectorAll('select').forEach((sel) => {
-      sel.addEventListener('change', () => {
-        settings[sel.id] = sel.value;
-      });
-    });
-
-    // Export
-    const exportBtn = document.getElementById('exportConfig');
-    if (exportBtn) {
-      exportBtn.addEventListener('click', () => {
-        const blob = new Blob([JSON.stringify(settings, null, 2)], { type: 'application/json' });
-        const url = URL.createObjectURL(blob);
-        const a = document.createElement('a');
-        a.href = url;
-        a.download = 'baptist-console-settings.json';
-        a.click();
-        setTimeout(() => URL.revokeObjectURL(url), 1000);
-      });
-    }
-
-    // Import
-    const importBtn = document.getElementById('importConfig');
-    const importFile = document.getElementById('importFile');
-    if (importBtn && importFile) {
-      importBtn.addEventListener('click', () => importFile.click());
-      importFile.addEventListener('change', () => {
-        const file = importFile.files[0];
-        if (!file) return;
-        const reader = new FileReader();
-        reader.onload = () => {
-          try {
-            const imported = JSON.parse(reader.result);
-            if (typeof imported !== 'object' || imported === null || Array.isArray(imported)) {
-              alert('Invalid settings file format.');
-              return;
-            }
-            const safeKeys = Object.keys(DEFAULTS);
-            const filtered = {};
-            for (const key of safeKeys) {
-              if (key in imported) {
-                filtered[key] = imported[key];
-              }
-            }
-            settings = { ...DEFAULTS, ...filtered };
-            saveSettings();
-            applyAllSettings();
-            showPanel('advanced');
-          } catch (e) {
-            alert('Could not parse settings file.');
-          }
-        };
-        reader.readAsText(file);
-      });
-    }
-
-    // Reset all
-    const resetAll = document.getElementById('resetAllSettings');
-    if (resetAll) {
-      resetAll.addEventListener('click', () => {
-        settings = { ...DEFAULTS };
-        saveSettings();
-        applyAllSettings();
-        showPanel('advanced');
-      });
-    }
-  }
-
-  function hexToRgb(hex) {
-    const n = parseInt(hex.replace('#', ''), 16);
-    return [(n >> 16) & 255, (n >> 8) & 255, n & 255];
-  }
-
-  function setAccentVars(el, hex) {
-    el.style.setProperty('--primary', hex);
-    const [r, g, b] = hexToRgb(hex);
-    el.style.setProperty('--primary-14', `rgba(${r},${g},${b},0.14)`);
-    el.style.setProperty('--primary-20', `rgba(${r},${g},${b},0.2)`);
-    el.style.setProperty('--primary-25', `rgba(${r},${g},${b},0.25)`);
-    el.style.setProperty('--primary-40', `rgba(${r},${g},${b},0.4)`);
-    el.style.setProperty('--primary-60', `rgba(${r},${g},${b},0.6)`);
-    el.style.setProperty('--link', hex);
-    el.style.setProperty('--highlight', hex);
-    el.style.setProperty('--highlight-soft', `rgba(${r},${g},${b},0.15)`);
-  }
-
-  function applySettingLive(key, value) {
-    if (key === 'theme') {
-      document.documentElement.classList.toggle('theme-light', value === 'light');
-      localStorage.setItem('globalTheme', value);
-      pushToIframes({ theme: value });
-    }
-    if (key === 'accent') {
-      const color = ACCENT_COLORS[value] || ACCENT_COLORS.blue;
-      setAccentVars(document.documentElement, color);
-      pushToIframes({ accent: color });
-    }
-    if (key === 'font') {
-      document.documentElement.style.setProperty('--font-main', `'${value}', system-ui, sans-serif`);
-      pushToIframes({ font: value });
-    }
-    if (key === 'corners') {
-      const sizes = { small: '6px', medium: '10px', large: '16px' };
-      document.documentElement.style.setProperty('--radius', sizes[value] || '10px');
-    }
-    if (key === 'density') {
-      const header = document.querySelector('.shell-header');
-      if (header) header.classList.toggle('compact', value === 'compact');
-    }
-    if (key === 'animations') {
-      document.body.classList.toggle('no-animations', !value);
-    }
-    pushToIframes({ settings });
-  }
-
-  function pushToIframes(opts) {
-    [bibleFrame, hymnFrame].forEach((frame) => {
-      try {
-        const win = frame.contentWindow;
-        if (win) win.postMessage({ type: 'settingsUpdate', settings }, '*');
-      } catch (e) {}
-    });
-  }
-
-  function applyAllSettings() {
-    applySettingLive('theme', settings.theme);
-    applySettingLive('accent', settings.accent);
-    applySettingLive('font', settings.font);
-    applySettingLive('corners', settings.corners);
-    applySettingLive('density', settings.density);
-    applySettingLive('animations', settings.animations);
-  }
-
-  // ── Modal Open/Close ──
-  function openSettings() {
-    loadSettings();
-    settingsBackup = JSON.parse(JSON.stringify(settings));
-    showPanel('appearance');
-    overlay.hidden = false;
-    // Sync sidebar active state
-    sidebar.querySelectorAll('.settings-cat').forEach((c) => {
-      c.classList.toggle('active', c.dataset.cat === 'appearance');
-    });
-  }
-
-  function closeSettings(cancel) {
-    if (cancel && settingsBackup) {
-      settings = settingsBackup;
-      applyAllSettings();
-    }
-    settingsBackup = null;
-    overlay.hidden = true;
-  }
-
-  settingsBtn.addEventListener('click', openSettings);
-  closeBtn.addEventListener('click', () => closeSettings(true));
-  cancelBtn.addEventListener('click', () => closeSettings(true));
-  overlay.addEventListener('click', (e) => {
-    if (e.target === overlay) closeSettings(true);
-  });
-
-  saveBtn.addEventListener('click', () => {
-    settingsBackup = null;
-    saveSettings();
-    applyAllSettings();
-    closeSettings(false);
-  });
-
-  resetBtn.addEventListener('click', () => {
-    settings = { ...DEFAULTS };
-    saveSettings();
-    applyAllSettings();
-    showPanel('appearance');
-    sidebar.querySelectorAll('.settings-cat').forEach((c) => {
-      c.classList.toggle('active', c.dataset.cat === 'appearance');
-    });
-  });
-
-  // Sidebar navigation
-  sidebar.querySelectorAll('.settings-cat').forEach((cat) => {
-    cat.addEventListener('click', () => {
-      sidebar.querySelectorAll('.settings-cat').forEach((c) => c.classList.remove('active'));
-      cat.classList.add('active');
-      showPanel(cat.dataset.cat);
-    });
-  });
-
   // ── Keyboard shortcuts ──
   document.addEventListener('keydown', (e) => {
-    // Ctrl/Cmd + , for settings
-    if ((e.ctrlKey || e.metaKey) && e.key === ',') {
-      e.preventDefault();
-      openSettings();
-    }
-    // Escape to close settings (cancel)
-    if (e.key === 'Escape' && !overlay.hidden) {
-      closeSettings(true);
-    }
-    // 1/2 for tab switching when not in input
     if (!e.ctrlKey && !e.metaKey && !e.altKey) {
       const tag = document.activeElement?.tagName;
       if (tag === 'INPUT' || tag === 'TEXTAREA' || tag === 'SELECT') return;
       if (e.key === '1') switchTab('bible');
       if (e.key === '2') switchTab('hymns');
+      if (e.key === 'Escape') {
+        const modal = document.getElementById('settingsModal');
+        if (modal && !modal.hidden) modal.hidden = true;
+      }
+    }
+  });
+
+  // ── Settings ──
+  const settingsBtn = document.getElementById('settingsBtn');
+  const settingsModal = document.getElementById('settingsModal');
+  const settingsBackdrop = document.getElementById('settingsBackdrop');
+
+  // Storage keys
+  const KEYS = {
+    theme: 'globalTheme',
+    presenterBg: 'settings_presenterBg',
+    presenterText: 'settings_presenterText',
+    presenterWeight: 'settings_presenterWeight',
+    presenterFont: 'settings_presenterFont',
+    presenterBgImage: 'settings_presenterBgImage',
+    presenterBgOpacity: 'settings_presenterBgOpacity',
+    bibleFontMax: 'biblePresenterFontMax',
+    bibleShowRef: 'settings_bibleShowRef',
+    hymnAlign: 'settings_hymnAlign',
+    hymnLayout: 'settings_hymnLayout',
+    hymnShowNumbers: 'settings_hymnShowNumbers',
+    hymnTitleSize: 'settings_hymnTitleSize',
+  };
+
+  const DEFAULTS = {
+    theme: 'dark',
+    presenterBg: '#000000',
+    presenterText: '#ffffff',
+    presenterWeight: '600',
+    presenterFont: "'Segoe UI', system-ui, sans-serif",
+    presenterBgImage: '',
+    presenterBgOpacity: 30,
+    bibleFontMax: 800,
+    bibleShowRef: 'true',
+    hymnAlign: 'left',
+    hymnLayout: 'full',
+    hymnShowNumbers: 'true',
+    hymnTitleSize: '7',
+  };
+
+  function loadSetting(key, fallback) {
+    try {
+      const stored = localStorage.getItem(key);
+      if (stored === null || stored === '') return fallback;
+      return stored;
+    } catch { return fallback; }
+  }
+
+  function saveSetting(key, value) {
+    localStorage.setItem(key, String(value));
+  }
+
+  // ── Color Palettes ──
+  const PALETTES = [
+    { id: 'classic',   name: 'Classic',      bg: '#000000', text: '#ffffff' },
+    { id: 'midnight',  name: 'Midnight',     bg: '#0a0a1a', text: '#e0e0ff' },
+    { id: 'navy',      name: 'Navy',         bg: '#0d1b2a', text: '#ffffff' },
+    { id: 'deep-blue', name: 'Deep Blue',    bg: '#1b2838', text: '#e8ecf0' },
+    { id: 'cathedral', name: 'Cathedral',    bg: '#1a1a2e', text: '#f5f5f5' },
+    { id: 'royal',     name: 'Royal',        bg: '#1a0a2e', text: '#e8d5ff' },
+    { id: 'wine',      name: 'Wine',         bg: '#2a0a0a', text: '#ffe8e8' },
+    { id: 'forest',    name: 'Forest',       bg: '#0a1a0d', text: '#e0ffe8' },
+    { id: 'warm-gold', name: 'Warm Gold',    bg: '#1a1400', text: '#ffd700' },
+    { id: 'slate',     name: 'Slate',        bg: '#1e293b', text: '#f1f5f9' },
+    { id: 'ember',     name: 'Ember',        bg: '#1c1008', text: '#fbbf24' },
+    { id: 'arctic',    name: 'Arctic',       bg: '#f0f4f8', text: '#1e293b' },
+    { id: 'cream',     name: 'Cream',        bg: '#faf8f0', text: '#2d2a1e' },
+    { id: 'rosewood',  name: 'Rosewood',     bg: '#2d1b2e', text: '#f5e6f5' },
+    { id: 'ocean',     name: 'Ocean',        bg: '#0c1929', text: '#7dd3fc' },
+    { id: 'pure',      name: 'Pure White',   bg: '#ffffff', text: '#1a1a1a' },
+  ];
+
+  let activePaletteId = null;
+
+  const paletteGrid = document.getElementById('paletteGrid');
+
+  function buildPaletteGrid() {
+    if (!paletteGrid) return;
+    paletteGrid.innerHTML = '';
+    PALETTES.forEach((p) => {
+      const card = document.createElement('div');
+      card.className = 'palette-card';
+      card.dataset.id = p.id;
+      card.innerHTML = `
+        <div class="palette-card-check">&#10003;</div>
+        <div class="palette-preview" style="background:${p.bg}; color:${p.text}">
+          <span class="palette-preview-text">The Lord is my shepherd</span>
+        </div>
+        <div class="palette-label">${p.name}</div>
+      `;
+      paletteGrid.appendChild(card);
+    });
+  }
+
+  function syncPaletteGrid() {
+    if (!paletteGrid) return;
+    const bg = loadSetting(KEYS.presenterBg, DEFAULTS.presenterBg);
+    const text = loadSetting(KEYS.presenterText, DEFAULTS.presenterText);
+    activePaletteId = null;
+    PALETTES.forEach((p) => {
+      if (p.bg === bg && p.text === text) activePaletteId = p.id;
+    });
+    paletteGrid.querySelectorAll('.palette-card').forEach((card) => {
+      card.classList.toggle('active', card.dataset.id === activePaletteId);
+    });
+  }
+
+  if (paletteGrid) {
+    buildPaletteGrid();
+    paletteGrid.addEventListener('click', (e) => {
+      const card = e.target.closest('.palette-card');
+      if (!card) return;
+      const palette = PALETTES.find((p) => p.id === card.dataset.id);
+      if (!palette) return;
+      saveSetting(KEYS.presenterBg, palette.bg);
+      saveSetting(KEYS.presenterText, palette.text);
+      syncBgColorUI();
+      syncTextColorUI();
+      syncPaletteGrid();
+      syncPreview();
+    });
+  }
+
+  function collectPresenterSettings() {
+    return {
+      bg: loadSetting(KEYS.presenterBg, DEFAULTS.presenterBg),
+      text: loadSetting(KEYS.presenterText, DEFAULTS.presenterText),
+      weight: loadSetting(KEYS.presenterWeight, DEFAULTS.presenterWeight),
+      font: loadSetting(KEYS.presenterFont, DEFAULTS.presenterFont),
+      bgImage: loadSetting(KEYS.presenterBgImage, DEFAULTS.presenterBgImage),
+      bgOpacity: Number(loadSetting(KEYS.presenterBgOpacity, DEFAULTS.presenterBgOpacity)),
+    };
+  }
+
+  function pushSettingsToIframes() {
+    const s = collectPresenterSettings();
+    [bibleFrame, hymnFrame].forEach((frame) => {
+      try {
+        frame.contentWindow?.postMessage({ type: 'settingsUpdate', ...s }, '*');
+      } catch (e) {}
+    });
+  }
+
+  function pushBibleMaxFont() {
+    const val = Number(loadSetting(KEYS.bibleFontMax, DEFAULTS.bibleFontMax));
+    [bibleFrame, hymnFrame].forEach((frame) => {
+      try {
+        frame.contentWindow?.postMessage({ type: 'bibleMaxFontUpdate', maxFont: val }, '*');
+      } catch (e) {}
+    });
+  }
+
+  function pushBibleSettings() {
+    const showRef = loadSetting(KEYS.bibleShowRef, DEFAULTS.bibleShowRef) === 'true';
+    [bibleFrame, hymnFrame].forEach((frame) => {
+      try {
+        frame.contentWindow?.postMessage({ type: 'bibleSettingsUpdate', showRef }, '*');
+      } catch (e) {}
+    });
+  }
+
+  function pushHymnSettings() {
+    const s = {
+      type: 'hymnSettingsUpdate',
+      align: loadSetting(KEYS.hymnAlign, DEFAULTS.hymnAlign),
+      layout: loadSetting(KEYS.hymnLayout, DEFAULTS.hymnLayout),
+      showNumbers: loadSetting(KEYS.hymnShowNumbers, DEFAULTS.hymnShowNumbers) === 'true',
+      titleSize: Number(loadSetting(KEYS.hymnTitleSize, DEFAULTS.hymnTitleSize)),
+    };
+    [bibleFrame, hymnFrame].forEach((frame) => {
+      try {
+        frame.contentWindow?.postMessage(s, '*');
+      } catch (e) {}
+    });
+  }
+
+  // ── Sidebar Tabs ──
+  const sidebarBtns = document.querySelectorAll('.settings-sidebar-btn');
+  const panels = document.querySelectorAll('.settings-panel');
+
+  sidebarBtns.forEach((btn) => {
+    btn.addEventListener('click', () => {
+      sidebarBtns.forEach((b) => b.classList.remove('active'));
+      btn.classList.add('active');
+      panels.forEach((p) => {
+        p.hidden = p.dataset.panel !== btn.dataset.panel;
+      });
+    });
+  });
+
+  // ── Theme Cards ──
+  const themeCards = document.querySelectorAll('.theme-card');
+
+  function syncThemeCards() {
+    const current = window.Theme ? window.Theme.current() : loadSetting(KEYS.theme, DEFAULTS.theme);
+    themeCards.forEach((c) => c.classList.toggle('active', c.dataset.theme === current));
+  }
+
+  themeCards.forEach((card) => {
+    card.addEventListener('click', () => {
+      if (window.Theme) window.Theme.apply(card.dataset.theme);
+      syncThemeCards();
+    });
+  });
+
+  // ── Presenter Background Color ──
+  const bgSwatches = document.getElementById('bgSwatches');
+  const bgColorPicker = document.getElementById('bgColorPicker');
+
+  function syncBgColorUI() {
+    const current = loadSetting(KEYS.presenterBg, DEFAULTS.presenterBg);
+    if (bgColorPicker) bgColorPicker.value = current;
+    if (bgSwatches) {
+      bgSwatches.querySelectorAll('.swatch[data-color]').forEach((s) => {
+        s.classList.toggle('active', s.dataset.color === current);
+      });
+    }
+  }
+
+  if (bgSwatches) {
+    bgSwatches.querySelectorAll('.swatch[data-color]').forEach((swatch) => {
+      swatch.addEventListener('click', () => {
+        const color = swatch.dataset.color;
+        saveSetting(KEYS.presenterBg, color);
+        syncBgColorUI();
+        syncPaletteGrid();
+        syncPreview();
+      });
+    });
+  }
+
+  if (bgColorPicker) {
+    bgColorPicker.addEventListener('input', () => {
+      saveSetting(KEYS.presenterBg, bgColorPicker.value);
+      if (bgSwatches) {
+        bgSwatches.querySelectorAll('.swatch[data-color]').forEach((s) => {
+          s.classList.remove('active');
+        });
+      }
+      syncPaletteGrid();
+      syncPreview();
+    });
+  }
+
+  // ── Presenter Text Color ──
+  const textSwatches = document.getElementById('textSwatches');
+  const textColorPicker = document.getElementById('textColorPicker');
+
+  function syncTextColorUI() {
+    const current = loadSetting(KEYS.presenterText, DEFAULTS.presenterText);
+    if (textColorPicker) textColorPicker.value = current;
+    if (textSwatches) {
+      textSwatches.querySelectorAll('.swatch[data-color]').forEach((s) => {
+        s.classList.toggle('active', s.dataset.color === current);
+      });
+    }
+  }
+
+  if (textSwatches) {
+    textSwatches.querySelectorAll('.swatch[data-color]').forEach((swatch) => {
+      swatch.addEventListener('click', () => {
+        const color = swatch.dataset.color;
+        saveSetting(KEYS.presenterText, color);
+        syncTextColorUI();
+        syncPaletteGrid();
+        syncPreview();
+      });
+    });
+  }
+
+  if (textColorPicker) {
+    textColorPicker.addEventListener('input', () => {
+      saveSetting(KEYS.presenterText, textColorPicker.value);
+      if (textSwatches) {
+        textSwatches.querySelectorAll('.swatch[data-color]').forEach((s) => {
+          s.classList.remove('active');
+        });
+      }
+      syncPaletteGrid();
+      syncPreview();
+    });
+  }
+
+  // ── Presenter Font Weight ──
+  const weightSelect = document.getElementById('weightSelect');
+
+  function syncWeightUI() {
+    const current = loadSetting(KEYS.presenterWeight, DEFAULTS.presenterWeight);
+    if (weightSelect) weightSelect.value = current;
+  }
+
+  if (weightSelect) {
+    syncWeightUI();
+    weightSelect.addEventListener('change', () => {
+      saveSetting(KEYS.presenterWeight, weightSelect.value);
+      syncPreview();
+    });
+  }
+
+  // ── Font Picker (system fonts) ──
+  const FONTS = [
+    { name: 'Segoe UI', value: "'Segoe UI', system-ui, sans-serif" },
+    { name: 'Arial', value: "Arial, sans-serif" },
+    { name: 'Verdana', value: "Verdana, sans-serif" },
+    { name: 'Trebuchet MS', value: "'Trebuchet MS', sans-serif" },
+    { name: 'Georgia', value: "Georgia, serif" },
+    { name: 'Times New Roman', value: "'Times New Roman', serif" },
+    { name: 'Palatino Linotype', value: "'Palatino Linotype', serif" },
+    { name: 'Courier New', value: "'Courier New', monospace" },
+  ];
+
+  const fontList = document.getElementById('fontList');
+
+  function buildFontList() {
+    if (!fontList) return;
+    FONTS.forEach((f) => {
+      const div = document.createElement('div');
+      div.className = 'font-option';
+      div.dataset.value = f.value;
+      div.style.fontFamily = f.value;
+      div.textContent = f.name;
+      fontList.appendChild(div);
+    });
+  }
+
+  function syncFontList() {
+    if (!fontList) return;
+    const current = loadSetting(KEYS.presenterFont, DEFAULTS.presenterFont);
+    fontList.querySelectorAll('.font-option').forEach((o) => {
+      o.classList.toggle('active', o.dataset.value === current);
+    });
+  }
+
+  if (fontList) {
+    buildFontList();
+    fontList.addEventListener('click', (e) => {
+      const opt = e.target.closest('.font-option');
+      if (!opt) return;
+      saveSetting(KEYS.presenterFont, opt.dataset.value);
+      fontList.querySelectorAll('.font-option').forEach((o) => o.classList.remove('active'));
+      opt.classList.add('active');
+      syncPreview();
+    });
+  }
+
+  // ── Background Image ──
+  const bgImagePath = document.getElementById('bgImagePath');
+  const bgImageBrowse = document.getElementById('bgImageBrowse');
+  const bgImageClear = document.getElementById('bgImageClear');
+  const bgOpacityRow = document.getElementById('bgOpacityRow');
+  const bgOpacityRange = document.getElementById('bgOpacityRange');
+  const bgOpacityValue = document.getElementById('bgOpacityValue');
+
+  function syncBgImageUI() {
+    const imgPath = loadSetting(KEYS.presenterBgImage, DEFAULTS.presenterBgImage);
+    const opacity = Number(loadSetting(KEYS.presenterBgOpacity, DEFAULTS.presenterBgOpacity));
+
+    if (bgImagePath) {
+      if (imgPath) {
+        const parts = imgPath.replace(/\\/g, '/').split('/');
+        bgImagePath.textContent = parts[parts.length - 1];
+        bgImagePath.classList.add('has-image');
+      } else {
+        bgImagePath.textContent = 'No image selected';
+        bgImagePath.classList.remove('has-image');
+      }
+    }
+
+    if (bgImageClear) bgImageClear.hidden = !imgPath;
+    if (bgOpacityRow) bgOpacityRow.hidden = !imgPath;
+    if (bgOpacityRange) bgOpacityRange.value = opacity;
+    if (bgOpacityValue) bgOpacityValue.textContent = opacity + '%';
+  }
+
+  if (bgImageBrowse) {
+    bgImageBrowse.addEventListener('click', async () => {
+      const api = window.presenterApi;
+      if (!api || !api.pickBackgroundImage) {
+        alert('File picker not available.');
+        return;
+      }
+      const filePath = await api.pickBackgroundImage();
+      if (filePath) {
+        saveSetting(KEYS.presenterBgImage, filePath);
+        syncBgImageUI();
+      }
+    });
+  }
+
+  if (bgImageClear) {
+    bgImageClear.addEventListener('click', () => {
+      saveSetting(KEYS.presenterBgImage, '');
+      syncBgImageUI();
+    });
+  }
+
+  if (bgOpacityRange) {
+    bgOpacityRange.addEventListener('input', () => {
+      const val = Number(bgOpacityRange.value);
+      if (bgOpacityValue) bgOpacityValue.textContent = val + '%';
+    });
+    bgOpacityRange.addEventListener('change', () => {
+      const val = Number(bgOpacityRange.value);
+      saveSetting(KEYS.presenterBgOpacity, val);
+    });
+  }
+
+  // ── Bible Max Font Size ──
+  const bibleMaxFontInput = document.getElementById('bibleMaxFont');
+  const bibleMaxFontRange = document.getElementById('bibleMaxFontRange');
+
+  function syncBibleMaxFontUI(val) {
+    if (bibleMaxFontInput) bibleMaxFontInput.value = val;
+    if (bibleMaxFontRange) bibleMaxFontRange.value = val;
+  }
+
+  function applyBibleMaxFont(val) {
+    const clamped = Math.min(800, Math.max(100, Number(val) || DEFAULTS.bibleFontMax));
+    saveSetting(KEYS.bibleFontMax, clamped);
+    syncBibleMaxFontUI(clamped);
+  }
+
+  if (bibleMaxFontInput) {
+    bibleMaxFontInput.addEventListener('change', () => {
+      const val = Number(bibleMaxFontInput.value) || DEFAULTS.bibleFontMax;
+      applyBibleMaxFont(val);
+    });
+  }
+
+  if (bibleMaxFontRange) {
+    bibleMaxFontRange.addEventListener('input', () => {
+      const val = Number(bibleMaxFontRange.value) || DEFAULTS.bibleFontMax;
+      if (bibleMaxFontInput) bibleMaxFontInput.value = val;
+    });
+    bibleMaxFontRange.addEventListener('change', () => {
+      const val = Number(bibleMaxFontRange.value) || DEFAULTS.bibleFontMax;
+      applyBibleMaxFont(val);
+    });
+  }
+
+  // ── Bible Show Reference ──
+  const bibleShowRef = document.getElementById('bibleShowRef');
+
+  function syncBibleShowRefUI() {
+    const current = loadSetting(KEYS.bibleShowRef, DEFAULTS.bibleShowRef) === 'true';
+    if (bibleShowRef) bibleShowRef.checked = current;
+  }
+
+  if (bibleShowRef) {
+    syncBibleShowRefUI();
+    bibleShowRef.addEventListener('change', () => {
+      saveSetting(KEYS.bibleShowRef, String(bibleShowRef.checked));
+    });
+  }
+
+  // ── Hymn Text Alignment ──
+  const hymnAlignGroup = document.getElementById('hymnAlignGroup');
+
+  function syncHymnAlignUI() {
+    const current = loadSetting(KEYS.hymnAlign, DEFAULTS.hymnAlign);
+    if (hymnAlignGroup) {
+      hymnAlignGroup.querySelectorAll('.settings-seg-btn').forEach((btn) => {
+        btn.classList.toggle('active', btn.dataset.value === current);
+      });
+    }
+  }
+
+  if (hymnAlignGroup) {
+    hymnAlignGroup.querySelectorAll('.settings-seg-btn').forEach((btn) => {
+      btn.addEventListener('click', () => {
+        saveSetting(KEYS.hymnAlign, btn.dataset.value);
+        syncHymnAlignUI();
+      });
+    });
+  }
+
+  // ── Hymn Slide Layout ──
+  const hymnLayoutGroup = document.getElementById('hymnLayoutGroup');
+
+  function syncHymnLayoutUI() {
+    const current = loadSetting(KEYS.hymnLayout, DEFAULTS.hymnLayout);
+    if (hymnLayoutGroup) {
+      hymnLayoutGroup.querySelectorAll('.settings-seg-btn').forEach((btn) => {
+        btn.classList.toggle('active', btn.dataset.value === current);
+      });
+    }
+  }
+
+  if (hymnLayoutGroup) {
+    hymnLayoutGroup.querySelectorAll('.settings-seg-btn').forEach((btn) => {
+      btn.addEventListener('click', () => {
+        saveSetting(KEYS.hymnLayout, btn.dataset.value);
+        syncHymnLayoutUI();
+      });
+    });
+  }
+
+  // ── Hymn Show Verse Numbers ──
+  const hymnShowNumbers = document.getElementById('hymnShowNumbers');
+
+  function syncHymnShowNumbersUI() {
+    const current = loadSetting(KEYS.hymnShowNumbers, DEFAULTS.hymnShowNumbers) === 'true';
+    if (hymnShowNumbers) hymnShowNumbers.checked = current;
+  }
+
+  if (hymnShowNumbers) {
+    syncHymnShowNumbersUI();
+    hymnShowNumbers.addEventListener('change', () => {
+      saveSetting(KEYS.hymnShowNumbers, String(hymnShowNumbers.checked));
+    });
+  }
+
+  // ── Hymn Title Font Size ──
+  const hymnTitleSize = document.getElementById('hymnTitleSize');
+  const hymnTitleSizeValue = document.getElementById('hymnTitleSizeValue');
+
+  function syncHymnTitleSizeUI() {
+    const current = loadSetting(KEYS.hymnTitleSize, DEFAULTS.hymnTitleSize);
+    if (hymnTitleSize) hymnTitleSize.value = current;
+    if (hymnTitleSizeValue) hymnTitleSizeValue.textContent = current + 'vw';
+  }
+
+  if (hymnTitleSize) {
+    syncHymnTitleSizeUI();
+    hymnTitleSize.addEventListener('input', () => {
+      if (hymnTitleSizeValue) hymnTitleSizeValue.textContent = hymnTitleSize.value + 'vw';
+    });
+    hymnTitleSize.addEventListener('change', () => {
+      saveSetting(KEYS.hymnTitleSize, hymnTitleSize.value);
+    });
+  }
+
+  // ── Segmented Controls (generic) ──
+  document.querySelectorAll('.settings-segmented').forEach((group) => {
+    group.querySelectorAll('.settings-seg-btn').forEach((btn) => {
+      btn.addEventListener('click', () => {
+        group.querySelectorAll('.settings-seg-btn').forEach((b) => b.classList.remove('active'));
+        btn.classList.add('active');
+      });
+    });
+  });
+
+  // ── Sync All Settings UI ──
+  function syncAllSettingsUI() {
+    syncThemeCards();
+    syncBgColorUI();
+    syncTextColorUI();
+    syncPaletteGrid();
+    syncWeightUI();
+    syncFontList();
+    syncBgImageUI();
+    syncBibleMaxFontUI(loadSetting(KEYS.bibleFontMax, DEFAULTS.bibleFontMax));
+    syncBibleShowRefUI();
+    syncHymnAlignUI();
+    syncHymnLayoutUI();
+    syncHymnShowNumbersUI();
+    syncHymnTitleSizeUI();
+    syncPreview();
+  }
+
+  // ── Live Preview ──
+  const previewVerse = document.getElementById('previewVerse');
+  const previewRef = document.getElementById('previewRef');
+  const previewBgDot = document.getElementById('previewBgDot');
+  const previewBgLabel = document.getElementById('previewBgLabel');
+  const previewTextDot = document.getElementById('previewTextDot');
+  const previewTextLabel = document.getElementById('previewTextLabel');
+  const previewFontLabel = document.getElementById('previewFontLabel');
+  const settingsPreview = document.getElementById('settingsPreview');
+
+  const biblePanelPreview = document.getElementById('biblePanelPreview');
+  const biblePreviewVerse = document.getElementById('biblePreviewVerse');
+  const biblePreviewRef = document.getElementById('biblePreviewRef');
+  const hymnPanelPreview = document.getElementById('hymnPanelPreview');
+  const hymnPreviewVerse = document.getElementById('hymnPreviewVerse');
+  const hymnPreviewTitle = document.getElementById('hymnPreviewTitle');
+
+  const COLOR_NAMES = {
+    '#000000': 'Black',
+    '#1a1a2e': 'Dark Gray',
+    '#0d1b2a': 'Navy',
+    '#1b2838': 'Deep Blue',
+    '#ffffff': 'White',
+    '#f0f0f0': 'Off-white',
+    '#ffd700': 'Gold',
+    '#e8e8e8': 'Light Gray',
+  };
+
+  const FONT_DISPLAY_NAMES = {
+    "'Segoe UI', system-ui, sans-serif": 'Segoe UI',
+    "Arial, sans-serif": 'Arial',
+    "Verdana, sans-serif": 'Verdana',
+    "'Trebuchet MS', sans-serif": 'Trebuchet MS',
+    "Georgia, serif": 'Georgia',
+    "'Times New Roman', serif": 'Times New Roman',
+    "'Palatino Linotype', serif": 'Palatino',
+    "'Courier New', monospace": 'Courier New',
+  };
+
+  function syncPreview() {
+    const bg = loadSetting(KEYS.presenterBg, DEFAULTS.presenterBg);
+    const text = loadSetting(KEYS.presenterText, DEFAULTS.presenterText);
+    const font = loadSetting(KEYS.presenterFont, DEFAULTS.presenterFont);
+    const weight = loadSetting(KEYS.presenterWeight, DEFAULTS.presenterWeight);
+
+    if (settingsPreview) {
+      settingsPreview.style.background = bg;
+      settingsPreview.style.color = text;
+    }
+    if (previewVerse) {
+      previewVerse.style.fontFamily = font;
+      previewVerse.style.fontWeight = weight;
+    }
+    if (previewBgDot) previewBgDot.style.background = bg;
+    if (previewBgLabel) previewBgLabel.textContent = COLOR_NAMES[bg] || 'Custom';
+    if (previewTextDot) previewTextDot.style.background = text;
+    if (previewTextLabel) previewTextLabel.textContent = COLOR_NAMES[text] || 'Custom';
+    if (previewFontLabel) previewFontLabel.textContent = FONT_DISPLAY_NAMES[font] || 'Custom';
+
+    if (biblePanelPreview) {
+      biblePanelPreview.style.background = bg;
+      biblePanelPreview.style.color = text;
+    }
+    if (biblePreviewVerse) {
+      biblePreviewVerse.style.fontFamily = font;
+      biblePreviewVerse.style.fontWeight = weight;
+    }
+
+    if (hymnPanelPreview) {
+      hymnPanelPreview.style.background = bg;
+      hymnPanelPreview.style.color = text;
+    }
+    if (hymnPreviewVerse) {
+      hymnPreviewVerse.style.fontFamily = font;
+      hymnPreviewVerse.style.fontWeight = weight;
+    }
+    if (hymnPreviewTitle) {
+      hymnPreviewTitle.style.fontFamily = font;
+      hymnPreviewTitle.style.fontWeight = weight;
+    }
+  }
+
+  // ── Hook syncPreview into all appearance change handlers ──
+
+  // ── Modal Open / Close ──
+  if (settingsBtn && settingsModal) {
+    settingsBtn.addEventListener('click', (e) => {
+      e.stopPropagation();
+      settingsModal.hidden = false;
+      syncAllSettingsUI();
+    });
+  }
+
+  if (settingsBackdrop) {
+    settingsBackdrop.addEventListener('click', () => {
+      settingsModal.hidden = true;
+    });
+  }
+
+  const settingsClose = document.getElementById('settingsClose');
+  if (settingsClose) {
+    settingsClose.addEventListener('click', () => {
+      settingsModal.hidden = true;
+    });
+  }
+
+  const settingsApply = document.getElementById('settingsApply');
+  if (settingsApply) {
+    settingsApply.addEventListener('click', (e) => {
+      e.stopPropagation();
+      pushSettingsToIframes();
+      pushBibleMaxFont();
+      pushBibleSettings();
+      pushHymnSettings();
+      settingsModal.hidden = true;
+    });
+  }
+
+  const settingsReset = document.getElementById('settingsReset');
+  if (settingsReset) {
+    settingsReset.addEventListener('click', (e) => {
+      e.stopPropagation();
+      Object.entries(KEYS).forEach(([key, storageKey]) => {
+        if (key === 'theme') return;
+        localStorage.removeItem(storageKey);
+      });
+      if (window.Theme) window.Theme.apply(DEFAULTS.theme);
+      syncAllSettingsUI();
+      pushSettingsToIframes();
+      pushBibleMaxFont();
+      pushBibleSettings();
+      pushHymnSettings();
+    });
+  }
+
+  // Push initial settings to iframes on load
+  [bibleFrame, hymnFrame].forEach((frame) => {
+    frame.addEventListener('load', () => {
+      pushSettingsToIframes();
+      pushBibleMaxFont();
+      pushBibleSettings();
+      pushHymnSettings();
+    });
+  });
+
+  // ── Presenter API Proxy ──
+  const api = window.presenterApi;
+
+  window.addEventListener('message', (e) => {
+    const data = e.data;
+    if (!data || typeof data !== 'object') return;
+    if (data.type !== 'presenterApiRequest') return;
+
+    const { requestId, method, args } = data;
+    const respond = (result, error) => {
+      e.source.postMessage({ type: 'presenterApiResponse', requestId, result, error }, '*');
+    };
+
+    if (!api) {
+      respond(null, 'presenterApi not available');
+      return;
+    }
+
+    try {
+      if (method === 'get-displays') {
+        api.getDisplays().then((result) => respond(result)).catch((err) => respond(null, err.message));
+      } else if (method === 'set-presenter-display') {
+        api.setPresenterDisplay(args[0]);
+        respond({ ok: true });
+      } else if (method === 'get-hymns') {
+        api.getHymns().then((result) => respond(result)).catch((err) => respond(null, err.message));
+      } else if (method === 'save-hymns') {
+        api.saveHymns(args[0]).then((result) => respond(result)).catch((err) => respond(null, err.message));
+      } else {
+        respond(null, 'Unknown method: ' + method);
+      }
+    } catch (err) {
+      respond(null, err.message);
     }
   });
 
@@ -580,10 +809,8 @@
   const maximizeBtn = document.getElementById('maximizeBtn');
   const minimizeBtn = document.getElementById('minimizeBtn');
   const winCloseBtn = document.getElementById('closeBtn');
-  const header = document.querySelector('.shell-header');
   const isElectron = navigator.userAgent.toLowerCase().includes('electron');
 
-  // Minimize
   if (minimizeBtn) {
     minimizeBtn.addEventListener('click', () => {
       if (isElectron && window.windowControls) {
@@ -592,7 +819,6 @@
     });
   }
 
-  // Maximize — fullscreen in browser
   if (maximizeBtn) {
     maximizeBtn.addEventListener('click', () => {
       if (isElectron && window.windowControls) {
@@ -607,7 +833,6 @@
     });
   }
 
-  // Close
   if (winCloseBtn) {
     winCloseBtn.addEventListener('click', () => {
       if (isElectron && window.windowControls) {
@@ -617,20 +842,4 @@
       }
     });
   }
-
-  // ── Init ──
-  loadSettings();
-
-  // Push settings once each iframe finishes loading
-  [bibleFrame, hymnFrame].forEach((frame) => {
-    frame.addEventListener('load', () => {
-      try {
-        const win = frame.contentWindow;
-        if (win) win.postMessage({ type: 'settingsUpdate', settings }, '*');
-      } catch (e) {}
-    });
-  });
-
-  // Also push immediately (may work if cached)
-  applyAllSettings();
 })();

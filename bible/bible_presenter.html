@@ -4,33 +4,23 @@
   <meta charset="UTF-8" />
   <title>Bible Console</title>
   <meta name="viewport" content="width=device-width, initial-scale=1" />
-  <link rel="stylesheet" href="../theme.css?v=5" />
-  <link rel="stylesheet" href="bible_presenter.css?v=5" />
+  <link rel="stylesheet" href="../theme.css" />
+  <link rel="stylesheet" href="bible_presenter.css" />
   <script>
     (() => {
       const theme = localStorage.getItem('globalTheme');
-      if (theme === 'light') {
-        document.documentElement.classList.add('theme-light');
+      if (theme === 'dark') {
+        document.documentElement.classList.add('theme-dark');
       }
     })();
   </script>
 </head>
 <body>
-  <!-- UI GROUP: Window Bar -->
-  <div class="window-bar" data-ui="bible-window-bar">
-    <div class="window-title">Bible Console</div>
-    <div class="window-controls" data-ui="bible-window-controls">
-      <button class="window-btn" data-window-action="minimize" aria-label="Minimize">&minus;</button>
-      <button class="window-btn" data-window-action="maximize" aria-label="Maximize">&#9633;</button>
-      <button class="window-btn close" data-window-action="close" aria-label="Close">&times;</button>
-    </div>
-  </div>
   <div class="app-shell" data-ui="bible-layout-shell">
     <!-- UI GROUP: Left Panel (Dropdowns + Present) -->
     <aside class="panel panel-left" data-ui="bible-sidebar-panel">
       <header class="panel-header">
         <div>
-          <a class="back-link" href="../index.html">&#8592; Home</a>
           <h1 class="app-title">Bible Console</h1>
           <p class="app-subtitle">KJV 1611</p>
         </div>
@@ -74,6 +64,15 @@
           <span>Auto-display on select</span>
         </label>
         <div class="present-status" id="presentStatus">Presenter: Off</div>
+        <div class="control-block presenter-display" id="presenterDisplayWrap" data-ui="bible-presenter-display-select" hidden>
+          <label for="presenterDisplayPicker" class="control-label">Presenter Display</label>
+          <select id="presenterDisplayPicker">
+            <option value="">Default Display</option>
+          </select>
+        </div>
+        <p class="present-hint">
+          Preview in the center panel, then display on the presenter screen.
+        </p>
       </section>
     </aside>
 
@@ -158,12 +157,6 @@
             <button id="nextVerseBtn" type="button">Next</button>
           </div>
 
-          <div class="control-block presenter-display" id="presenterDisplayWrap" data-ui="bible-presenter-display-select">
-            <select id="presenterDisplayPicker">
-              <option value="">Default Display</option>
-            </select>
-          </div>
-
           <div class="font-size-controls" data-ui="bible-font-controls">
             <button id="fontMinus" type="button" class="font-btn">A-</button>
             <button id="fontPlus" type="button" class="font-btn">A+</button>
@@ -195,23 +188,10 @@
     </aside>
   </div>
 
-  <script src="../theme.js?v=5"></script>
-  <script src="bible.js?v=5"></script>
-  <script>
-    (() => {
-      if (window.self !== window.top) document.body.classList.add('in-iframe');
-      const controls = window.windowControls;
-      document.querySelectorAll('[data-window-action]').forEach((btn) => {
-        btn.addEventListener('click', () => {
-          if (!controls) return;
-          const action = btn.getAttribute('data-window-action');
-          if (action === 'minimize') controls.minimize();
-          if (action === 'maximize') controls.maximize();
-          if (action === 'close') controls.close();
-        });
-      });
-    })();
-  </script>
+  <script src="../theme.js"></script>
+  <script src="../presenter-proxy.js"></script>
+  <script src="bible.js"></script>
+
 </body>
 </html>
 

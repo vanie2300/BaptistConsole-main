@@ -25,4 +25,5 @@ contextBridge.exposeInMainWorld('presenterApi', {
     }
     return ipcRenderer.invoke('save-hymns', hymns);
   },
+  pickBackgroundImage: () => ipcRenderer.invoke('pick-background-image'),
 });

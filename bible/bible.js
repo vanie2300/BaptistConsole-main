@@ -17,7 +17,6 @@ let lastSearchQuery = "";
 
 let presentWindow = null;
 let presenterStatusTimer = null;
-let presenterWindowId = 0;
 const PRESENTER_BIAS_DEFAULT = 1.3;
 let presenterFitBias = PRESENTER_BIAS_DEFAULT;
 let presenterAutoDisplayId = null;
@@ -33,7 +32,13 @@ let presenterFontSizePx = 90;
 const CENTER_FONT_MIN = 18;
 const CENTER_FONT_MAX = 96;
 const PRESENTER_FONT_MIN = 36;
-const PRESENTER_FONT_MAX = 800;
+let presenterFontMax = (() => {
+  try {
+    const stored = localStorage.getItem("biblePresenterFontMax");
+    const val = stored !== null ? Number(stored) : 800;
+    return Number.isFinite(val) ? val : 800;
+  } catch { return 800; }
+})();
 const PRESENTER_BIAS_MIN = 0.7;
 const PRESENTER_BIAS_MAX = 1.55;
 const PRESENTER_BIAS_STEP = 0.06;
@@ -173,45 +178,25 @@ function wireEvents() {
   });
 
   window.addEventListener("resize", () => {
-    if (window._resizeTimer) cancelAnimationFrame(window._resizeTimer);
-    window._resizeTimer = requestAnimationFrame(() => {
-      autoFitCenterText(centerFontSizePx);
-    });
+    autoFitCenterText(centerFontSizePx);
   });
-}
 
-// ======== SETTINGS FROM SHELL ========
-
-let appSettings = {};
-
-window.addEventListener("message", (evt) => {
-  if (!evt.data || evt.data.type !== "settingsUpdate") return;
-  appSettings = evt.data.settings || {};
-  applyBibleSettings();
-});
-
-function applyBibleSettings() {
-  const versesList = els.versesList;
-  if (versesList) {
-    // Show/hide verse numbers
-    versesList.classList.toggle("hide-verse-numbers", appSettings.showVerseNumbers === false);
-    // Highlight active verse
-    versesList.classList.toggle("no-highlight-verse", appSettings.highlightVerse === false);
-  }
-  // Bible font size → update presenter font size
-  if (appSettings.bibleFontSize) {
-    presenterFontSizePx = appSettings.bibleFontSize;
-  }
-  // Projection font
-  if (appSettings.projectionFont && appSettings.projectionFont !== "system-ui") {
-    const fontMap = {
-      "Inter, sans-serif": "Inter, sans-serif",
-      "Georgia, serif": "Georgia, serif",
-      "'Times New Roman', serif": "'Times New Roman', serif",
-    };
-    const mapped = fontMap[appSettings.projectionFont] || appSettings.projectionFont;
-    document.documentElement.style.setProperty("--font-main", mapped);
-  }
+  window.addEventListener("message", (e) => {
+    const data = e.data;
+    if (!data || typeof data !== "object") return;
+    if (data.type === "bibleMaxFontUpdate" && typeof data.maxFont === "number") {
+      presenterFontMax = data.maxFont;
+    }
+    if (data.type === "bibleSettingsUpdate") {
+      if (typeof data.showRef === 'boolean') {
+        var refEl = document.getElementById('presentRef');
+        if (refEl) refEl.style.display = data.showRef ? '' : 'none';
+      }
+    }
+    if ((data.type === "settingsUpdate" || data.type === "bibleSettingsUpdate" || data.type === "hymnSettingsUpdate") && presentWindow && !presentWindow.closed) {
+      presentWindow.postMessage(data, "*");
+    }
+  });
 }
 
 function openSearchDropdown() {
@@ -263,9 +248,7 @@ function initPreviewToggle() {
 
 function onPreviewToggleChange() {
   previewOnSelect = Boolean(els.previewToggle?.checked);
-  try {
-    localStorage.setItem("biblePreviewOnSelect", String(previewOnSelect));
-  } catch (e) {}
+  localStorage.setItem("biblePreviewOnSelect", String(previewOnSelect));
   if (previewOnSelect && isPresenterOpen()) {
     const location = getCurrentLocation();
     if (location) {
@@ -281,7 +264,7 @@ function initPresenterDisplayPicker() {
   const api = window.presenterApi;
   if (!api || !els.presenterDisplayWrap || !els.presenterDisplayPicker) return;
 
-  const stored = localStorage.getItem("biblePresenterDisplayId");
+  const stored = localStorage.getItem("presenterDisplayId");
   const storedId = stored ? Number(stored) : null;
   let autoLabel = "";
 
@@ -351,7 +334,7 @@ function initPresenterDisplayPicker() {
   els.presenterDisplayPicker.addEventListener("change", () => {
     const value = els.presenterDisplayPicker.value;
     if (!value) {
-      localStorage.removeItem("biblePresenterDisplayId");
+      localStorage.removeItem("presenterDisplayId");
       api.setPresenterDisplay(null);
       presenterDisplayIsAuto = true;
       presenterDisplayLabel = autoLabel;
@@ -359,7 +342,7 @@ function initPresenterDisplayPicker() {
       return;
     }
     const displayId = Number(value);
-    localStorage.setItem("biblePresenterDisplayId", String(displayId));
+    localStorage.setItem("presenterDisplayId", String(displayId));
     api.setPresenterDisplay(displayId);
     presenterDisplayIsAuto = false;
     presenterDisplayLabel = els.presenterDisplayPicker.selectedOptions[0]?.textContent || "";
@@ -602,7 +585,6 @@ function renderChapterVerses(bookSlug, chapter) {
   }
 
   highlightCurrentVerseRow(false);
-  applyBibleSettings();
 }
 
 function renderSearchResults(list) {
@@ -641,7 +623,6 @@ function renderSearchResults(list) {
 
     els.versesList.appendChild(row);
   }
-  applyBibleSettings();
 }
 
 function appendHighlightedText(container, text, query) {
@@ -846,9 +827,7 @@ function getRecentSearches() {
 }
 
 function saveRecentSearches(list) {
-  try {
-    localStorage.setItem(RECENT_SEARCH_KEY, JSON.stringify(list));
-  } catch (e) {}
+  localStorage.setItem(RECENT_SEARCH_KEY, JSON.stringify(list));
 }
 
 function addRecentSearch(item) {
@@ -898,7 +877,7 @@ function goToReference(refString) {
   const bookSlug = normalizeBookName(rawBook);
 
   if (!bookMeta[bookSlug]) return false;
-  if (!bible[bookSlug] || !bible[bookSlug][chapter] || !bible[bookSlug][chapter][verse]) return false;
+  if (!bible[bookSlug][chapter] || !bible[bookSlug][chapter][verse]) return false;
 
   goToVerse(bookSlug, chapter, verse, true);
   return true;
@@ -987,10 +966,6 @@ function setupSearchSuggestions() {
 // ======== VERSE NAV HELPERS ========
 
 function goToVerse(bookSlug, chapter, verse, forcePreview = false) {
-  if (!bible[bookSlug] || !bible[bookSlug][chapter] || !bible[bookSlug][chapter][verse]) {
-    return;
-  }
-
   currentBook = bookSlug;
   currentChapter = chapter;
   currentVerse = verse;
@@ -1156,8 +1131,13 @@ function autoFitCenterText(maxPx = centerFontSizePx) {
 
 function setPresenterState(isOpen) {
   if (els.presentStatus) {
-    const mode = `Auto (${Math.round(presenterFitBias * 100)}%)`;
-    els.presentStatus.textContent = `${isOpen ? "Presenter: On" : "Presenter: Off"} \u2022 ${mode}`;
+    const base = isOpen ? "Presenter: On" : "Presenter: Off";
+    const label = presenterDisplayLabel
+      ? `${presenterDisplayIsAuto ? "Auto: " : ""}${presenterDisplayLabel}`
+      : "";
+    const mode = `Size: Auto (${Math.round(presenterFitBias * 100)}%)`;
+    const displayPart = label ? `${label} | ` : "";
+    els.presentStatus.textContent = `${base} | ${displayPart}${mode}`;
     els.presentStatus.classList.toggle("is-active", isOpen);
   }
   if (els.fontAuto) {
@@ -1191,7 +1171,7 @@ function monitorPresenterWindow() {
 function openPresenterWindow() {
   const api = window.presenterApi;
   if (api) {
-    const stored = localStorage.getItem("biblePresenterDisplayId");
+    const stored = localStorage.getItem("presenterDisplayId");
     const storedId = stored ? Number(stored) : null;
     const preferredId = storedId ?? presenterAutoDisplayId ?? null;
     api.setPresenterDisplay(preferredId);
@@ -1225,52 +1205,115 @@ function openPresenterWindow() {
 <head>
   <meta charset="UTF-8" />
   <title>Bible Presenter</title>
-  <link rel="stylesheet" href="../theme.css?v=5">
   <style>
+    :root {
+      --present-bg: ${(() => { try { return localStorage.getItem('settings_presenterBg') || '#000000'; } catch { return '#000000'; } })()};
+      --present-text: ${(() => { try { return localStorage.getItem('settings_presenterText') || '#ffffff'; } catch { return '#ffffff'; } })()};
+      --present-accent: #60a5fa;
+      --present-weight: ${(() => { try { return localStorage.getItem('settings_presenterWeight') || '600'; } catch { return '600'; } })()};
+      --present-font: ${(() => { try { return localStorage.getItem('settings_presenterFont') || "'Segoe UI', system-ui, sans-serif"; } catch { return "'Segoe UI', system-ui, sans-serif"; } })()};
+    }
+    .theme-dark { --present-accent: #60a5fa; }
+    .theme-light { --present-accent: #1a73e8; }
     html, body {
       margin: 0;
       padding: 0;
       height: 100%;
-      background: var(--bg);
-      color: var(--text);
-      font-family: var(--font-main, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif);
+      background: var(--present-bg, #000000);
+      color: var(--present-text, #ffffff);
+      font-family: var(--present-font, 'Segoe UI', system-ui, sans-serif);
+    }
+    #bgImageLayer {
+      position: fixed;
+      inset: 0;
+      background-size: cover;
+      background-position: center;
+      z-index: -1;
+      pointer-events: none;
+      display: none;
     }
     body {
+      position: relative;
       display: flex;
       flex-direction: column;
       justify-content: center;
       align-items: center;
       box-sizing: border-box;
       padding: clamp(12px, 2.2vw, 28px);
+      z-index: 1;
     }
     #presentRef {
       font-size: clamp(0.58rem, 1vw, 0.9rem);
       font-weight: 600;
       letter-spacing: 0.2em;
       text-transform: uppercase;
-      color: var(--primary);
+      color: var(--present-accent, #60a5fa);
       margin-bottom: 0.9rem;
       text-align: center;
       max-width: min(92vw, 1400px);
     }
     #presentText {
       font-size: ${initialSize};
-      font-weight: 600;
+      font-weight: var(--present-weight, 600);
       line-height: 1.16;
       text-align: center;
-      width: min(94vw, 1800px);
       white-space: pre-wrap;
     }
   </style>
 </head>
 <body>
+  <div id="bgImageLayer"></div>
   <div id="presentRef"></div>
   <div id="presentText"></div>
   <script>
     function applyThemeFromStorage() {
       const theme = localStorage.getItem('globalTheme');
+      document.documentElement.classList.toggle('theme-dark', theme === 'dark');
       document.documentElement.classList.toggle('theme-light', theme === 'light');
     }
+
+    function applyPresenterSettings(s) {
+      const root = document.documentElement;
+      if (s.bg) root.style.setProperty('--present-bg', s.bg);
+      if (s.text) root.style.setProperty('--present-text', s.text);
+      if (s.weight) {
+        root.style.setProperty('--present-weight', s.weight);
+        var textEl = document.getElementById('presentText');
+        if (textEl) textEl.style.fontWeight = s.weight;
+      }
+      if (s.font) {
+        root.style.setProperty('--present-font', s.font);
+        var textEl2 = document.getElementById('presentText');
+        if (textEl2) textEl2.style.fontFamily = s.font;
+        var refEl = document.getElementById('presentRef');
+        if (refEl) refEl.style.fontFamily = s.font;
+      }
+      var bgLayer = document.getElementById('bgImageLayer');
+      if (bgLayer) {
+        if (s.bgImage) {
+          bgLayer.style.backgroundImage = 'url("file:///' + s.bgImage.replace(/\\\\/g, '/').replace(/"/g, '\\\\"') + '")';
+          bgLayer.style.opacity = String((s.bgOpacity || 30) / 100);
+          bgLayer.style.display = 'block';
+        } else {
+          bgLayer.style.display = 'none';
+        }
+      }
+      schedulePresenterFit();
+    }
+
+    window.addEventListener('message', function(evt) {
+      if (!evt.data) return;
+      if (evt.data.type === 'settingsUpdate') {
+        applyPresenterSettings(evt.data);
+      }
+      if (evt.data.type === 'bibleSettingsUpdate') {
+        if (typeof evt.data.showRef === 'boolean') {
+          var refEl = document.getElementById('presentRef');
+          if (refEl) refEl.style.display = evt.data.showRef ? '' : 'none';
+        }
+      }
+    });
+
 
     function requestFullscreenSafe() {
       try {
@@ -1296,7 +1339,7 @@ function openPresenterWindow() {
     }
 
     const FIT_FONT_MIN = ${PRESENTER_FONT_MIN};
-    const FIT_FONT_MAX = ${PRESENTER_FONT_MAX};
+    const FIT_FONT_MAX = ${presenterFontMax};
     const FIT_BIAS_MIN = ${PRESENTER_BIAS_MIN};
     const FIT_BIAS_MAX = ${PRESENTER_BIAS_MAX};
 
@@ -1327,8 +1370,8 @@ function openPresenterWindow() {
       const paddingY = (parseFloat(bodyStyle.paddingTop) || 0) + (parseFloat(bodyStyle.paddingBottom) || 0);
       const refMargins = (parseFloat(refStyle.marginTop) || 0) + (parseFloat(refStyle.marginBottom) || 0);
 
-      const width = Math.floor(bodyRect.width - paddingX - 8);
-      const height = Math.floor(bodyRect.height - paddingY - refEl.offsetHeight - refMargins - 8);
+      const width = Math.floor(bodyRect.width - paddingX - 4);
+      const height = Math.floor(bodyRect.height - paddingY - refEl.offsetHeight - refMargins - 4);
 
       if (width <= 0 || height <= 0) return null;
       return { width, height };
@@ -1371,38 +1414,26 @@ function openPresenterWindow() {
 
       const minDim = Math.max(1, Math.min(window.innerHeight || space.height, window.innerWidth || space.width));
       const normalizedBias = clamp(fitBias, FIT_BIAS_MIN, FIT_BIAS_MAX);
-      const coverage = clamp(0.965 + (normalizedBias - 1) * 0.14, 0.86, 0.995);
+      const coverage = clamp(0.98 + (normalizedBias - 1) * 0.14, 0.86, 0.995);
       const availableWidth = Math.max(1, Math.floor(space.width * coverage));
       const availableHeight = Math.max(1, Math.floor(space.height * coverage));
       const dynamicMaxBase = Math.round(
-        clamp(Math.min(minDim * 0.58, availableHeight * 0.98, availableWidth * 0.64), FIT_FONT_MIN + 20, FIT_FONT_MAX)
+        clamp(Math.min(minDim * 0.68, availableHeight * 0.98, availableWidth * 0.74), FIT_FONT_MIN + 20, FIT_FONT_MAX)
       );
       const requestedMax = parsePx(maxPx, dynamicMaxBase);
-      const biasedMax = Math.round(Math.max(dynamicMaxBase, requestedMax) * normalizedBias);
-      const upperBound = clamp(biasedMax, FIT_FONT_MIN, FIT_FONT_MAX);
+      const upperBound = clamp(Math.round(Math.max(dynamicMaxBase, requestedMax) * normalizedBias), FIT_FONT_MIN, FIT_FONT_MAX);
 
       textEl.style.width = '100%';
       textEl.style.maxWidth = availableWidth + 'px';
 
-      textEl.style.fontSize = upperBound + 'px';
-      const widthRatio = textEl.scrollWidth / availableWidth;
-      const heightRatio = textEl.scrollHeight / availableHeight;
-      const overflowRatio = Math.max(1, widthRatio, heightRatio);
-
-      let high = Math.max(FIT_FONT_MIN, Math.floor(upperBound / overflowRatio));
-      textEl.style.fontSize = high + 'px';
-      while (high > FIT_FONT_MIN && overflows(textEl, availableWidth, availableHeight)) {
-        high -= 2;
-        textEl.style.fontSize = high + 'px';
-      }
-
       let low = FIT_FONT_MIN;
-      let best = 0;
+      let high = upperBound;
+      let best = FIT_FONT_MIN;
 
       while (low <= high) {
         const mid = Math.floor((low + high) / 2);
         textEl.style.fontSize = mid + 'px';
-        if (!overflows(textEl, availableWidth, availableHeight)) {
+        if (textEl.scrollHeight <= availableHeight && textEl.scrollWidth <= availableWidth) {
           best = mid;
           low = mid + 1;
         } else {
@@ -1410,14 +1441,11 @@ function openPresenterWindow() {
         }
       }
 
-      if (best === 0) {
-        // Emergency fallback: prefer fitting without clipping over preferred minimum.
-        let emergency = FIT_FONT_MIN;
-        while (emergency > 16 && overflows(textEl, availableWidth, availableHeight)) {
-          emergency -= 1;
-          textEl.style.fontSize = emergency + 'px';
-        }
-        best = emergency;
+      const verseText = textEl.textContent || '';
+      const verseLen = verseText.length;
+      if (verseLen > 0 && verseLen < 80) {
+        const cap = Math.round(150 + (verseLen / 80) * 300);
+        best = Math.min(best, cap);
       }
 
       textEl.style.fontSize = best + 'px';
@@ -1477,6 +1505,11 @@ function openPresenterWindow() {
       clearFitQueue();
     });
     window.addEventListener('click', requestFullscreenSafe);
+    (function() {
+      var showRef = localStorage.getItem('settings_bibleShowRef');
+      var refEl = document.getElementById('presentRef');
+      if (refEl && showRef === 'false') refEl.style.display = 'none';
+    })();
     updateVerse(${JSON.stringify({
       reference: initialRef,
       text: initialText,
@@ -1490,15 +1523,12 @@ function openPresenterWindow() {
   presentWindow.document.open();
   presentWindow.document.write(html);
   presentWindow.document.close();
-  const myWindowId = ++presenterWindowId;
   presentWindow.addEventListener("beforeunload", () => {
-    if (presenterWindowId === myWindowId) {
-      presentWindow = null;
-      setPresenterState(false);
-      if (presenterStatusTimer) {
-        clearInterval(presenterStatusTimer);
-        presenterStatusTimer = null;
-      }
+    presentWindow = null;
+    setPresenterState(false);
+    if (presenterStatusTimer) {
+      clearInterval(presenterStatusTimer);
+      presenterStatusTimer = null;
     }
   });
   setPresenterState(true);
@@ -1527,9 +1557,7 @@ function saveLastLocation() {
     chapter: currentChapter,
     verse: currentVerse,
   };
-  try {
-    localStorage.setItem("bibleLastLocation", JSON.stringify(data));
-  } catch (e) {}
+  localStorage.setItem("bibleLastLocation", JSON.stringify(data));
 }
 
 function restoreLastLocation() {
