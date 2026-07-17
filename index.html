@@ -229,10 +229,6 @@
         <!-- Bible Panel -->
         <div class="settings-panel" data-panel="bible" hidden>
           <div class="settings-panel-title">Bible Presenter</div>
-          <div class="panel-preview" id="biblePanelPreview">
-            <div class="panel-preview-verse" id="biblePreviewVerse">For God so loved the world</div>
-            <div class="panel-preview-ref" id="biblePreviewRef">John 3:16</div>
-          </div>
           <div class="settings-section">
             <div class="settings-section-label">Text Sizing</div>
             <div class="settings-card">
@@ -266,11 +262,6 @@
         <!-- Hymns Panel -->
         <div class="settings-panel" data-panel="hymns" hidden>
           <div class="settings-panel-title">Hymn Presenter</div>
-          <div class="panel-preview" id="hymnPanelPreview">
-            <div class="panel-preview-hymn-num" id="hymnPreviewNum">3</div>
-            <div class="panel-preview-hymn-title" id="hymnPreviewTitle">Amazing Grace</div>
-            <div class="panel-preview-verse" id="hymnPreviewVerse">Amazing grace, how sweet the sound</div>
-          </div>
           <div class="settings-section">
             <div class="settings-section-label">Layout</div>
             <div class="settings-card">
@@ -310,6 +301,13 @@
                   <span class="settings-unit" id="hymnTitleSizeValue">7vw</span>
                 </div>
               </div>
+              <div class="settings-field">
+                <label class="settings-label">Slide Transition</label>
+                <div class="settings-segmented" id="hymnTransitionGroup">
+                  <button class="settings-seg-btn active" data-value="none">None</button>
+                  <button class="settings-seg-btn" data-value="fade">Fade</button>
+                </div>
+              </div>
             </div>
           </div>
         </div>
@@ -317,12 +315,22 @@
 
       <!-- Right Panel: Preview + Actions -->
       <aside class="settings-right-panel">
-        <div class="settings-right-header">
+          <div class="settings-right-header">
           <div class="settings-right-title">Live Preview</div>
           <div class="settings-preview" id="settingsPreview">
-            <div class="settings-preview-verse" id="previewVerse">The Lord is my shepherd; I shall not want.</div>
-            <div class="settings-preview-ref" id="previewRef">Psalm 23:1</div>
-            <div class="settings-preview-meta">
+            <!-- Theme/Bible preview (default) -->
+            <div id="previewThemeBible">
+              <div class="settings-preview-label" id="previewLabel">Verse 1</div>
+              <div class="settings-preview-verse" id="previewVerse">The Lord is my shepherd; I shall not want.</div>
+              <div class="settings-preview-ref" id="previewRef">Psalm 23:1</div>
+            </div>
+            <!-- Hymn preview (shown when Hymn tab active) -->
+            <div id="previewHymn" hidden>
+              <div class="settings-preview-hymn-num" id="previewHymnNum">3</div>
+              <div class="settings-preview-hymn-title" id="previewHymnTitle">Amazing Grace</div>
+              <div class="settings-preview-hymn-verse" id="previewHymnVerse">Amazing grace, how sweet the sound</div>
+            </div>
+            <div class="settings-preview-meta" id="previewMeta">
               <span class="settings-preview-chip">
                 <span class="settings-preview-chip-dot" id="previewBgDot"></span>
                 <span id="previewBgLabel">Black</span>

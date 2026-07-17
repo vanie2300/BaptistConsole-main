@@ -69,6 +69,8 @@ body {
     border: none;
     gap: 2vw;
     font-weight: bold;
+    opacity: 1;
+    transition: opacity 0.3s ease;
 }
 .slide-label {
     font-weight: bold;
@@ -119,6 +121,8 @@ body {
 <script>
 let slides = [];
 let currentIndex = 0;
+let _hymnTransition = 'none';
+let _fadeLock = false;
 
 function requestFullscreenSafe() {
     try {
@@ -149,43 +153,59 @@ function escapeHtml(text) {
     })[m]);
 }
 
-function renderSlide() {
+function renderSlide(fade) {
     const slide = slides[currentIndex] || { lines: ['End of hymn'] };
     const container = document.getElementById('slideContent');
     const align = window._hymnAlign || localStorage.getItem('settings_hymnAlign') || 'left';
     const layout = window._hymnLayout || localStorage.getItem('settings_hymnLayout') || 'full';
     const showNumbers = window._hymnShowNumbers !== undefined ? window._hymnShowNumbers : (localStorage.getItem('settings_hymnShowNumbers') !== 'false');
     const titleSize = window._hymnTitleSize || Number(localStorage.getItem('settings_hymnTitleSize')) || 7;
+    const transition = _hymnTransition || 'none';
 
-    container.style.textAlign = align;
-    container.style.maxWidth = layout === 'compact' ? '70vw' : '100%';
-    container.style.padding = layout === 'compact' ? '4vw 10vw' : '2vw 3vw';
+    function paintSlide() {
+        container.style.textAlign = align;
+        container.style.maxWidth = layout === 'compact' ? '70vw' : '100%';
+        container.style.padding = layout === 'compact' ? '4vw 10vw' : '2vw 3vw';
 
-    if (slide.type === 'title') {
-        container.classList.add('centered');
-        container.innerHTML = `
-            <div class="slide-title" id="autoFitTarget" style="font-size:${titleSize}vw">${escapeHtml(slide.title)}</div>
-        `;
-        autoFitText(document.getElementById('autoFitTarget'), titleSize, 2);
-    } else {
-        container.classList.remove('centered');
-        const label = slide.type === 'chorus' ? 'Chorus' : 'Verse ' + slide.number;
-        const content = (slide.lines || []).map(escapeHtml).join('<br>');
-        if (showNumbers) {
+        if (slide.type === 'title') {
+            container.classList.add('centered');
             container.innerHTML = `
-                <div class="slide-label" id="autoFitLabel">${label}</div>
-                <div class="slide-lyrics" id="autoFitLyrics">${content}</div>
+                <div class="slide-title" id="autoFitTarget" style="font-size:${titleSize}vw">${escapeHtml(slide.title)}</div>
             `;
-            autoFitText(document.getElementById('autoFitLyrics'), 6.5, 4);
-            autoFitText(document.getElementById('autoFitLabel'), 3, 1.2);
+            autoFitText(document.getElementById('autoFitTarget'), titleSize, 2);
         } else {
-            container.innerHTML = `
-                <div class="slide-lyrics" id="autoFitLyrics">${content}</div>
-            `;
-            autoFitText(document.getElementById('autoFitLyrics'), 7, 4);
+            container.classList.remove('centered');
+            const label = slide.type === 'chorus' ? 'Chorus' : 'Verse ' + slide.number;
+            const content = (slide.lines || []).map(escapeHtml).join('<br>');
+            if (showNumbers) {
+                container.innerHTML = `
+                    <div class="slide-label" id="autoFitLabel">${label}</div>
+                    <div class="slide-lyrics" id="autoFitLyrics">${content}</div>
+                `;
+                autoFitText(document.getElementById('autoFitLyrics'), 6.5, 4);
+                autoFitText(document.getElementById('autoFitLabel'), 3, 1.2);
+            } else {
+                container.innerHTML = `
+                    <div class="slide-lyrics" id="autoFitLyrics">${content}</div>
+                `;
+                autoFitText(document.getElementById('autoFitLyrics'), 7, 4);
+            }
         }
+        autoFitText(container);
     }
-    autoFitText(container);
+
+    if (fade && transition === 'fade' && !_fadeLock) {
+        _fadeLock = true;
+        container.style.opacity = '0';
+        setTimeout(() => {
+            paintSlide();
+            container.style.opacity = '1';
+            setTimeout(() => { _fadeLock = false; }, 320);
+        }, 300);
+    } else {
+        container.style.opacity = '1';
+        paintSlide();
+    }
 }
 
 function applyPresenterSettings() {
@@ -246,7 +266,7 @@ window.addEventListener('message', function(e) {
         renderSlide();
     } else if (e.data && e.data.type === 'navigate') {
         currentIndex = e.data.currentIndex;
-        renderSlide();
+        renderSlide(true);
     } else if (e.data && e.data.type === 'settingsUpdate') {
         const root = document.documentElement;
         if (e.data.bg) root.style.setProperty('--present-bg', e.data.bg);
@@ -268,6 +288,7 @@ window.addEventListener('message', function(e) {
         if (e.data.layout) window._hymnLayout = e.data.layout;
         if (typeof e.data.showNumbers === 'boolean') window._hymnShowNumbers = e.data.showNumbers;
         if (typeof e.data.titleSize === 'number') window._hymnTitleSize = e.data.titleSize;
+        if (e.data.transition) _hymnTransition = e.data.transition;
         renderSlide();
     }
 });
@@ -286,7 +307,7 @@ window.addEventListener('keydown', function(e) {
     if (e.key === 'ArrowRight' || e.key === 'PageDown') {
         if (currentIndex < slides.length - 1) {
             currentIndex++;
-            renderSlide();
+            renderSlide(true);
             if (window.opener && !window.opener.closed) {
                 window.opener.postMessage({ type: 'navigateFromPopup', currentIndex }, '*');
             }
@@ -294,7 +315,7 @@ window.addEventListener('keydown', function(e) {
     } else if (e.key === 'ArrowLeft' || e.key === 'PageUp') {
         if (currentIndex > 0) {
             currentIndex--;
-            renderSlide();
+            renderSlide(true);
             if (window.opener && !window.opener.closed) {
                 window.opener.postMessage({ type: 'navigateFromPopup', currentIndex }, '*');
             }

@@ -452,48 +452,6 @@ body {
   gap: 16px;
 }
 
-/* ── Settings Panel Preview ── */
-
-.panel-preview {
-  border-radius: 10px;
-  padding: 24px 20px;
-  min-height: 100px;
-  display: flex;
-  flex-direction: column;
-  justify-content: center;
-  align-items: center;
-  gap: 6px;
-  transition: background 0.2s ease, color 0.2s ease;
-}
-
-.panel-preview-verse {
-  font-size: 1rem;
-  font-weight: 600;
-  line-height: 1.5;
-  text-align: center;
-}
-
-.panel-preview-ref {
-  font-size: 0.72rem;
-  opacity: 0.5;
-}
-
-.panel-preview-hymn-num {
-  font-size: 0.7rem;
-  font-weight: 600;
-  opacity: 0.5;
-  text-transform: uppercase;
-  letter-spacing: 0.08em;
-}
-
-.panel-preview-hymn-title {
-  font-size: 1.1rem;
-  font-weight: 700;
-  line-height: 1.3;
-  text-align: center;
-  margin-bottom: 4px;
-}
-
 /* ── Palette Grid ── */
 
 .palette-grid {
@@ -767,16 +725,48 @@ body {
 }
 
 .settings-preview-verse {
-  font-size: 1.15rem;
+  font-size: 1.05rem;
   font-weight: 600;
   line-height: 1.5;
   text-align: center;
   max-width: 280px;
 }
 
+.settings-preview-label {
+  font-size: 0.7rem;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  opacity: 0.5;
+}
+
 .settings-preview-ref {
   font-size: 0.72rem;
   opacity: 0.5;
+}
+
+.settings-preview-hymn-num {
+  font-size: 0.7rem;
+  font-weight: 600;
+  opacity: 0.5;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+}
+
+.settings-preview-hymn-title {
+  font-size: 1.05rem;
+  font-weight: 700;
+  line-height: 1.3;
+  text-align: center;
+  margin-bottom: 4px;
+}
+
+.settings-preview-hymn-verse {
+  font-size: 0.85rem;
+  font-weight: 500;
+  line-height: 1.5;
+  text-align: center;
+  opacity: 0.8;
 }
 
 .settings-preview-meta {

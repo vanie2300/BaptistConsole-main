@@ -261,7 +261,7 @@
       state.currentIndex = data.currentIndex;
       renderSlides();
     }
-    if (data.type === 'settingsUpdate' && state.presentationWindow && !state.presentationWindow.closed) {
+    if ((data.type === 'settingsUpdate' || data.type === 'hymnSettingsUpdate') && state.presentationWindow && !state.presentationWindow.closed) {
       state.presentationWindow.postMessage(data, '*');
     }
   };

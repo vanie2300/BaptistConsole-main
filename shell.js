@@ -86,6 +86,7 @@
     hymnLayout: 'settings_hymnLayout',
     hymnShowNumbers: 'settings_hymnShowNumbers',
     hymnTitleSize: 'settings_hymnTitleSize',
+    hymnTransition: 'settings_hymnTransition',
   };
 
   const DEFAULTS = {
@@ -102,6 +103,7 @@
     hymnLayout: 'full',
     hymnShowNumbers: 'true',
     hymnTitleSize: '7',
+    hymnTransition: 'none',
   };
 
   function loadSetting(key, fallback) {
@@ -232,6 +234,7 @@
       layout: loadSetting(KEYS.hymnLayout, DEFAULTS.hymnLayout),
       showNumbers: loadSetting(KEYS.hymnShowNumbers, DEFAULTS.hymnShowNumbers) === 'true',
       titleSize: Number(loadSetting(KEYS.hymnTitleSize, DEFAULTS.hymnTitleSize)),
+      transition: loadSetting(KEYS.hymnTransition, DEFAULTS.hymnTransition),
     };
     [bibleFrame, hymnFrame].forEach((frame) => {
       try {
@@ -251,6 +254,7 @@
       panels.forEach((p) => {
         p.hidden = p.dataset.panel !== btn.dataset.panel;
       });
+      syncPreview();
     });
   });
 
@@ -516,6 +520,7 @@
     syncBibleShowRefUI();
     bibleShowRef.addEventListener('change', () => {
       saveSetting(KEYS.bibleShowRef, String(bibleShowRef.checked));
+      syncPreview();
     });
   }
 
@@ -596,6 +601,27 @@
     });
   }
 
+  // ── Hymn Slide Transition ──
+  const hymnTransitionGroup = document.getElementById('hymnTransitionGroup');
+
+  function syncHymnTransitionUI() {
+    const current = loadSetting(KEYS.hymnTransition, DEFAULTS.hymnTransition);
+    if (hymnTransitionGroup) {
+      hymnTransitionGroup.querySelectorAll('.settings-seg-btn').forEach((btn) => {
+        btn.classList.toggle('active', btn.dataset.value === current);
+      });
+    }
+  }
+
+  if (hymnTransitionGroup) {
+    hymnTransitionGroup.querySelectorAll('.settings-seg-btn').forEach((btn) => {
+      btn.addEventListener('click', () => {
+        saveSetting(KEYS.hymnTransition, btn.dataset.value);
+        syncHymnTransitionUI();
+      });
+    });
+  }
+
   // ── Segmented Controls (generic) ──
   document.querySelectorAll('.settings-segmented').forEach((group) => {
     group.querySelectorAll('.settings-seg-btn').forEach((btn) => {
@@ -621,25 +647,26 @@
     syncHymnLayoutUI();
     syncHymnShowNumbersUI();
     syncHymnTitleSizeUI();
+    syncHymnTransitionUI();
     syncPreview();
   }
 
   // ── Live Preview ──
   const previewVerse = document.getElementById('previewVerse');
   const previewRef = document.getElementById('previewRef');
+  const previewLabel = document.getElementById('previewLabel');
   const previewBgDot = document.getElementById('previewBgDot');
   const previewBgLabel = document.getElementById('previewBgLabel');
   const previewTextDot = document.getElementById('previewTextDot');
   const previewTextLabel = document.getElementById('previewTextLabel');
   const previewFontLabel = document.getElementById('previewFontLabel');
   const settingsPreview = document.getElementById('settingsPreview');
-
-  const biblePanelPreview = document.getElementById('biblePanelPreview');
-  const biblePreviewVerse = document.getElementById('biblePreviewVerse');
-  const biblePreviewRef = document.getElementById('biblePreviewRef');
-  const hymnPanelPreview = document.getElementById('hymnPanelPreview');
-  const hymnPreviewVerse = document.getElementById('hymnPreviewVerse');
-  const hymnPreviewTitle = document.getElementById('hymnPreviewTitle');
+  const previewMeta = document.getElementById('previewMeta');
+  const previewThemeBible = document.getElementById('previewThemeBible');
+  const previewHymn = document.getElementById('previewHymn');
+  const previewHymnNum = document.getElementById('previewHymnNum');
+  const previewHymnTitle = document.getElementById('previewHymnTitle');
+  const previewHymnVerse = document.getElementById('previewHymnVerse');
 
   const COLOR_NAMES = {
     '#000000': 'Black',
@@ -663,46 +690,65 @@
     "'Courier New', monospace": 'Courier New',
   };
 
+  function getActivePanel() {
+    const activeBtn = document.querySelector('.settings-sidebar-btn.active');
+    return activeBtn ? activeBtn.dataset.panel : 'theme';
+  }
+
   function syncPreview() {
     const bg = loadSetting(KEYS.presenterBg, DEFAULTS.presenterBg);
     const text = loadSetting(KEYS.presenterText, DEFAULTS.presenterText);
     const font = loadSetting(KEYS.presenterFont, DEFAULTS.presenterFont);
     const weight = loadSetting(KEYS.presenterWeight, DEFAULTS.presenterWeight);
+    const activePanel = getActivePanel();
 
+    // Switch preview content based on active panel
+    if (previewThemeBible) previewThemeBible.hidden = activePanel === 'hymns';
+    if (previewHymn) previewHymn.hidden = activePanel !== 'hymns';
+    if (previewMeta) previewMeta.hidden = activePanel === 'hymns';
+
+    // Always apply bg/color to the preview container
     if (settingsPreview) {
       settingsPreview.style.background = bg;
       settingsPreview.style.color = text;
     }
-    if (previewVerse) {
-      previewVerse.style.fontFamily = font;
-      previewVerse.style.fontWeight = weight;
-    }
-    if (previewBgDot) previewBgDot.style.background = bg;
-    if (previewBgLabel) previewBgLabel.textContent = COLOR_NAMES[bg] || 'Custom';
-    if (previewTextDot) previewTextDot.style.background = text;
-    if (previewTextLabel) previewTextLabel.textContent = COLOR_NAMES[text] || 'Custom';
-    if (previewFontLabel) previewFontLabel.textContent = FONT_DISPLAY_NAMES[font] || 'Custom';
 
-    if (biblePanelPreview) {
-      biblePanelPreview.style.background = bg;
-      biblePanelPreview.style.color = text;
-    }
-    if (biblePreviewVerse) {
-      biblePreviewVerse.style.fontFamily = font;
-      biblePreviewVerse.style.fontWeight = weight;
-    }
+    if (activePanel === 'hymns') {
+      // Hymn preview
+      if (previewHymnNum) {
+        previewHymnNum.style.fontFamily = font;
+      }
+      if (previewHymnTitle) {
+        previewHymnTitle.style.fontFamily = font;
+        previewHymnTitle.style.fontWeight = weight;
+      }
+      if (previewHymnVerse) {
+        previewHymnVerse.style.fontFamily = font;
+        previewHymnVerse.style.fontWeight = weight;
+      }
+    } else {
+      // Theme/Bible preview
+      const showRef = loadSetting(KEYS.bibleShowRef, DEFAULTS.bibleShowRef) === 'true';
+      if (previewVerse) {
+        previewVerse.style.fontFamily = font;
+        previewVerse.style.fontWeight = weight;
+      }
+      if (previewLabel) {
+        previewLabel.style.fontFamily = font;
+        previewLabel.style.fontWeight = weight;
+      }
+      if (previewRef) {
+        previewRef.style.fontFamily = font;
+        previewRef.hidden = activePanel === 'bible' && !showRef;
+      }
 
-    if (hymnPanelPreview) {
-      hymnPanelPreview.style.background = bg;
-      hymnPanelPreview.style.color = text;
-    }
-    if (hymnPreviewVerse) {
-      hymnPreviewVerse.style.fontFamily = font;
-      hymnPreviewVerse.style.fontWeight = weight;
-    }
-    if (hymnPreviewTitle) {
-      hymnPreviewTitle.style.fontFamily = font;
-      hymnPreviewTitle.style.fontWeight = weight;
+      // Chips (only show on Theme panel)
+      if (previewMeta) previewMeta.style.display = activePanel === 'theme' ? '' : 'none';
+      if (previewBgDot) previewBgDot.style.background = bg;
+      if (previewBgLabel) previewBgLabel.textContent = COLOR_NAMES[bg] || 'Custom';
+      if (previewTextDot) previewTextDot.style.background = text;
+      if (previewTextLabel) previewTextLabel.textContent = COLOR_NAMES[text] || 'Custom';
+      if (previewFontLabel) previewFontLabel.textContent = FONT_DISPLAY_NAMES[font] || 'Custom';
     }
   }
 
