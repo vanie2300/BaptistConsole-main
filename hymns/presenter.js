@@ -44,17 +44,15 @@
     refs.status.classList.toggle('error', Boolean(isError));
   };
 
-  const setPresenterState = (isOpen) => {
+const setPresenterState = (isOpen) => {
     if (refs.presentStatus) {
-      const base = isOpen ? 'Presenter: On' : 'Presenter: Off';
-      const label = presenterDisplayLabel
-        ? `${presenterDisplayIsAuto ? 'Auto: ' : ''}${presenterDisplayLabel}`
-        : '';
-      refs.presentStatus.textContent = label ? `${base} · ${label}` : base;
+      const parts = [isOpen ? 'On' : 'Off'];
+      if (presenterDisplayLabel) parts.push(presenterDisplayLabel);
+      refs.presentStatus.textContent = parts.join(' · ');
       refs.presentStatus.classList.toggle('is-active', isOpen);
     }
     if (refs.presentBtn) {
-      refs.presentBtn.textContent = isOpen ? 'Presenter Active' : 'Present';
+      refs.presentBtn.textContent = isOpen ? 'Active' : 'Present';
     }
   };
 
@@ -82,7 +80,8 @@
     return chunks;
   };
 
-  const getMaxLines = (lines) => {
+const getMaxLines = (lines) => {
+    if (!lines || !lines.length) return 4;
     const longLines = lines.filter((line) => line.length > 35).length;
     const ratio = longLines / lines.length;
     if (ratio === 0) return 4;
@@ -112,21 +111,32 @@
     return slides;
   };
 
+const getHymnSettings = () => ({
+    align: localStorage.getItem('settings_hymnAlign') || 'left',
+    layout: localStorage.getItem('settings_hymnLayout') || 'full',
+    showNumbers: localStorage.getItem('settings_hymnShowNumbers') !== 'false',
+    titleSize: Number(localStorage.getItem('settings_hymnTitleSize')) || 7,
+    transition: localStorage.getItem('settings_hymnTransition') || 'none',
+  });
+
   const slideToHtml = (slide, mode = 'current') => {
     const wrapper = document.createElement('div');
     wrapper.className = 'resizable-text';
+    const settings = getHymnSettings();
+    wrapper.style.textAlign = settings.align;
     if (slide.type === 'title') {
-      wrapper.innerHTML = `<div class="slide-title">${escapeHtml(slide.title)}</div>`;
+      const titleSize = mode === 'thumb' ? 7 : settings.titleSize;
+      wrapper.innerHTML = `<div class="slide-title" style="font-size:${titleSize}vw">${escapeHtml(slide.title)}</div>`;
     } else {
       const label = slide.type === 'chorus' ? 'Chorus' : `Verse ${slide.number}`;
       const content = (slide.lines || []).map(escapeHtml).join('<br>');
-      wrapper.innerHTML = `<div class="verse-label">${label}</div>${content}`;
+      wrapper.innerHTML = `${settings.showNumbers ? `<div class="verse-label">${label}</div>` : ''}${content}`;
     }
 
     const textLength = wrapper.textContent.length;
     let fontSize;
-    if (mode === 'current') fontSize = textLength < 80 ? '3.6vw' : '2.6vw';
-    else if (mode === 'next') fontSize = textLength < 80 ? '2vw' : '1.4vw';
+    if (mode === 'current') fontSize = textLength < 80 ? '3vw' : '2.2vw';
+    else if (mode === 'next') fontSize = textLength < 80 ? '1.8vw' : '1.2vw';
     else fontSize = textLength > 150 ? '0.65rem' : '0.8rem';
     wrapper.style.fontSize = fontSize;
     return wrapper.outerHTML;
@@ -217,10 +227,11 @@
     }
     if (state.presentationWindow && !state.presentationWindow.closed) {
       state.presentationWindow.focus();
-      state.presentationWindow.postMessage({
+state.presentationWindow.postMessage({
         type: 'init',
         slides: state.slides,
         currentIndex: state.currentIndex,
+        ...getHymnSettings(),
       }, '*');
       setPresenterState(true);
       monitorPresenterWindow();
@@ -234,11 +245,12 @@
     }
 
     state.presentationWindow = popup;
-    const sendInit = () => {
+const sendInit = () => {
       popup.postMessage({
         type: 'init',
         slides: state.slides,
         currentIndex: state.currentIndex,
+        ...getHymnSettings(),
       }, '*');
     };
     popup.onload = sendInit;
@@ -255,10 +267,17 @@
     monitorPresenterWindow();
   };
 
-  const handleMessage = (event) => {
+const handleMessage = (event) => {
     const data = event.data || {};
     if (data.type === 'navigateFromPopup') {
-      state.currentIndex = data.currentIndex;
+      if (state.presentationWindow && event.source === state.presentationWindow) {
+        state.currentIndex = data.currentIndex;
+        renderSlides();
+      }
+      return;
+    }
+    if (event.source !== window.parent) return;
+    if (data.type === 'hymnSettingsUpdate') {
       renderSlides();
     }
     if ((data.type === 'settingsUpdate' || data.type === 'hymnSettingsUpdate') && state.presentationWindow && !state.presentationWindow.closed) {
@@ -320,7 +339,7 @@
       ...(chorusLines.length ? { chorus: chorusLines } : {}),
     };
 
-    state.hymns.push(newHymn);
+state.hymns.push(newHymn);
     state.hymns.sort((a, b) => a.title.localeCompare(b.title));
     state.filtered = [...state.hymns];
     renderList();
@@ -330,7 +349,22 @@
       setStatus(`Added "${newHymn.title}".`);
     } catch (err) {
       console.error(err);
-      setStatus('Could not save hymns.json.', true);
+      state.hymns = state.hymns.filter((h) => h !== newHymn);
+      state.filtered = state.filtered.filter((h) => h !== newHymn);
+      if (state.selectedId === (newHymn.id ?? newHymn.title)) {
+        state.selectedId = null;
+        state.selectedIndex = null;
+        state.slides = [];
+        refs.currentSlide.innerHTML = '<em>Select a hymn...</em>';
+        refs.nextSlide.innerHTML = '';
+        refs.thumbnails.innerHTML = '';
+        refs.prevBtn.disabled = true;
+        refs.nextBtn.disabled = true;
+        refs.presentBtn.disabled = true;
+      }
+      renderList();
+      updateDeleteState();
+      setStatus('Could not save hymns.json; hymn rolled back.', true);
     }
     closeModal();
   };
@@ -391,13 +425,24 @@
     refs.presentBtn.disabled = true;
     renderList();
     updateDeleteState();
-    setStatus(`Deleted "${hymn.title}". Saving hymns.json...`);
+setStatus(`Deleted "${hymn.title}". Saving hymns.json...`);
     try {
       await persistHymns();
       setStatus(`Deleted "${hymn.title}".`);
     } catch (err) {
       console.error(err);
-      setStatus('Could not save hymns.json.', true);
+      state.hymns.push(hymn);
+      state.hymns.sort((a, b) => a.title.localeCompare(b.title));
+      state.filtered = [...state.hymns];
+      const restoredIndex = state.filtered.findIndex((h) => h === hymn);
+      if (restoredIndex >= 0) {
+        state.selectedIndex = restoredIndex;
+        state.selectedId = hymn.id ?? hymn.title;
+        selectHymn(restoredIndex);
+      } else {
+        renderList();
+      }
+      setStatus('Could not save hymns.json; deletion rolled back.', true);
     }
   };
 
@@ -439,14 +484,8 @@
     const storedId = stored ? Number(stored) : null;
     let autoLabel = '';
 
-    const formatLabel = (display, index) => {
-      const size = display.size || display.bounds || {};
-      const labelBase = display.isPrimary ? 'Primary' : `Display ${index + 1}`;
-      if (size.width && size.height) {
-        return `${labelBase} (${size.width}x${size.height})`;
-      }
-      return labelBase;
-    };
+const formatLabel = (display, index) =>
+      display.isPrimary ? 'Primary' : `Display ${index + 1}`;
 
     const pickAutoDisplay = (displays) =>
       displays.find((display) => !display.isPrimary) || displays[0] || null;
@@ -454,7 +493,7 @@
     api.getDisplays().then((displays) => {
       if (!Array.isArray(displays) || displays.length === 0) return;
       refs.presenterDisplayWrap.hidden = false;
-      refs.presenterDisplayPicker.innerHTML = '<option value=\"\">Default Display</option>';
+      refs.presenterDisplayPicker.innerHTML = '<option value="">Auto</option>';
       displays.forEach((display, index) => {
         const option = document.createElement('option');
         option.value = String(display.id);

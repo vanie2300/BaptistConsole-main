@@ -20,16 +20,7 @@
     if (bg) document.documentElement.style.setProperty('--present-bg', bg);
     if (text) document.documentElement.style.setProperty('--present-text', text);
     if (font) document.documentElement.style.setProperty('--present-font', font);
-    var bgImage = localStorage.getItem('settings_presenterBgImage');
-    var bgOpacity = localStorage.getItem('settings_presenterBgOpacity');
-    if (bgImage) {
-      var layer = document.getElementById('bgImageLayer');
-      if (layer) {
-        layer.style.backgroundImage = 'url("file:///' + bgImage.replace(/\\/g, '/').replace(/"/g, '\\"') + '")';
-        layer.style.opacity = String((Number(bgOpacity) || 30) / 100);
-        layer.style.display = 'block';
-      }
-    }
+    if (weight) document.documentElement.style.setProperty('--present-weight', weight);
   })();
 </script>
 <style>
@@ -46,6 +37,7 @@ body {
     position: relative;
     z-index: 1;
     font-family: var(--present-font, 'Segoe UI', 'Arial', sans-serif);
+    font-weight: var(--present-weight, 400);
 }
 #bgImageLayer {
     position: fixed;
@@ -86,7 +78,7 @@ body {
     font-size: 7vw;
     width: 100%;
  
-    color: var(--text);
+    color: var(--present-text, var(--text));
     text-shadow: 0 2px 8px #000a;
    
     display: flex;
@@ -96,7 +88,7 @@ body {
 .slide-lyrics {
     font-size: 1vw;
     line-height: 1.18;
-    color: var(--text);
+    color: var(--present-text, var(--text));
     text-shadow: 0 2px 8px #000a;
     width: 100%;
     word-break: break-word;
@@ -123,18 +115,6 @@ let slides = [];
 let currentIndex = 0;
 let _hymnTransition = 'none';
 let _fadeLock = false;
-
-function requestFullscreenSafe() {
-    try {
-        if (document.fullscreenElement) return;
-        const el = document.documentElement;
-        if (el.requestFullscreen) {
-            el.requestFullscreen().catch(() => {});
-        }
-    } catch (err) {
-        // Ignore fullscreen errors (browser policy, etc).
-    }
-}
 
 function maximizeWindow() {
     const isElectron = navigator.userAgent.toLowerCase().includes('electron');
@@ -167,10 +147,13 @@ function renderSlide(fade) {
         container.style.maxWidth = layout === 'compact' ? '70vw' : '100%';
         container.style.padding = layout === 'compact' ? '4vw 10vw' : '2vw 3vw';
 
+        const weight = localStorage.getItem('settings_presenterWeight') || '600';
+        const font = localStorage.getItem('settings_presenterFont') || "'Segoe UI', system-ui, sans-serif";
+
         if (slide.type === 'title') {
             container.classList.add('centered');
             container.innerHTML = `
-                <div class="slide-title" id="autoFitTarget" style="font-size:${titleSize}vw">${escapeHtml(slide.title)}</div>
+                <div class="slide-title" id="autoFitTarget" style="font-size:${titleSize}vw; font-weight:${weight}; font-family:${font}">${escapeHtml(slide.title)}</div>
             `;
             autoFitText(document.getElementById('autoFitTarget'), titleSize, 2);
         } else {
@@ -179,14 +162,14 @@ function renderSlide(fade) {
             const content = (slide.lines || []).map(escapeHtml).join('<br>');
             if (showNumbers) {
                 container.innerHTML = `
-                    <div class="slide-label" id="autoFitLabel">${label}</div>
-                    <div class="slide-lyrics" id="autoFitLyrics">${content}</div>
+                    <div class="slide-label" id="autoFitLabel" style="font-weight:${weight}; font-family:${font}">${label}</div>
+                    <div class="slide-lyrics" id="autoFitLyrics" style="font-weight:${weight}; font-family:${font}">${content}</div>
                 `;
                 autoFitText(document.getElementById('autoFitLyrics'), 6.5, 4);
                 autoFitText(document.getElementById('autoFitLabel'), 3, 1.2);
             } else {
                 container.innerHTML = `
-                    <div class="slide-lyrics" id="autoFitLyrics">${content}</div>
+                    <div class="slide-lyrics" id="autoFitLyrics" style="font-weight:${weight}; font-family:${font}">${content}</div>
                 `;
                 autoFitText(document.getElementById('autoFitLyrics'), 7, 4);
             }
@@ -208,14 +191,18 @@ function renderSlide(fade) {
     }
 }
 
+function fileUrlCss(path) {
+    return 'url("file:///' + String(path).replace(/\\/g, '/').replace(/[()'"]/g, (ch) => '\\' + ch) + '")';
+}
+
 function applyPresenterSettings() {
     const root = document.documentElement;
     const bg = localStorage.getItem('settings_presenterBg');
     const text = localStorage.getItem('settings_presenterText');
     const weight = localStorage.getItem('settings_presenterWeight');
     const font = localStorage.getItem('settings_presenterFont');
-    const bgImage = localStorage.getItem('settings_presenterBgImage');
-    const bgOpacity = localStorage.getItem('settings_presenterBgOpacity');
+    const bgImage = localStorage.getItem('settings_hymnBgImage') || localStorage.getItem('settings_presenterBgImage');
+    const bgOpacity = localStorage.getItem('settings_hymnBgOpacity') || localStorage.getItem('settings_presenterBgOpacity');
 
     if (bg) root.style.setProperty('--present-bg', bg);
     if (text) root.style.setProperty('--present-text', text);
@@ -224,7 +211,7 @@ function applyPresenterSettings() {
     var bgLayer = document.getElementById('bgImageLayer');
     if (bgLayer) {
         if (bgImage) {
-            bgLayer.style.backgroundImage = 'url("file:///' + bgImage.replace(/\\/g, '/').replace(/"/g, '\\"') + '")';
+            bgLayer.style.backgroundImage = fileUrlCss(bgImage);
             bgLayer.style.opacity = String((Number(bgOpacity) || 30) / 100);
             bgLayer.style.display = 'block';
         } else {
@@ -232,9 +219,10 @@ function applyPresenterSettings() {
         }
     }
 
-    // Apply weight to lyric/label elements
-    document.querySelectorAll('.slide-lyrics, .slide-label').forEach((el) => {
+    // Apply weight and font to all lyric/label/title elements
+    document.querySelectorAll('.slide-lyrics, .slide-label, .slide-title').forEach((el) => {
         if (weight) el.style.fontWeight = weight;
+        if (font) el.style.fontFamily = font;
     });
     renderSlide();
 }
@@ -260,9 +248,15 @@ function autoFitText(container, maxFont = 8, minFont = 4) {
 
 // Listen for messages from the main window
 window.addEventListener('message', function(e) {
+    if (e.source !== window.opener) return;
     if (e.data && e.data.type === 'init') {
         slides = e.data.slides;
         currentIndex = e.data.currentIndex;
+        if (e.data.align) window._hymnAlign = e.data.align;
+        if (e.data.layout) window._hymnLayout = e.data.layout;
+        if (typeof e.data.showNumbers === 'boolean') window._hymnShowNumbers = e.data.showNumbers;
+        if (typeof e.data.titleSize === 'number') window._hymnTitleSize = e.data.titleSize;
+        if (e.data.transition && ['none', 'fade'].includes(e.data.transition)) _hymnTransition = e.data.transition;
         renderSlide();
     } else if (e.data && e.data.type === 'navigate') {
         currentIndex = e.data.currentIndex;
@@ -275,7 +269,7 @@ window.addEventListener('message', function(e) {
         var bgLayer = document.getElementById('bgImageLayer');
         if (bgLayer) {
             if (e.data.bgImage) {
-                bgLayer.style.backgroundImage = 'url("file:///' + e.data.bgImage.replace(/\\/g, '/').replace(/"/g, '\\"') + '")';
+                bgLayer.style.backgroundImage = fileUrlCss(e.data.bgImage);
                 bgLayer.style.opacity = String((e.data.bgOpacity || 30) / 100);
                 bgLayer.style.display = 'block';
             } else {
@@ -288,21 +282,32 @@ window.addEventListener('message', function(e) {
         if (e.data.layout) window._hymnLayout = e.data.layout;
         if (typeof e.data.showNumbers === 'boolean') window._hymnShowNumbers = e.data.showNumbers;
         if (typeof e.data.titleSize === 'number') window._hymnTitleSize = e.data.titleSize;
-        if (e.data.transition) _hymnTransition = e.data.transition;
+        if (e.data.transition && ['none', 'fade'].includes(e.data.transition)) _hymnTransition = e.data.transition;
         renderSlide();
-    }
-});
+}
+}, true);
 
 window.addEventListener('load', function() {
     applyThemeFromStorage();
     applyPresenterSettings();
     maximizeWindow();
-    requestFullscreenSafe();
 });
-window.addEventListener('click', requestFullscreenSafe);
 
 // Keyboard navigation (optional)
-window.addEventListener('keydown', function(e) {
+document.addEventListener('keydown', function(e) {
+    if (e.key === 'Escape') {
+        e.preventDefault();
+        e.stopPropagation();
+        if (document.fullscreenElement && document.exitFullscreen) {
+            try { document.exitFullscreen(); } catch (err) {}
+        }
+        if (window.presenterApi && window.presenterApi.closeWindow) {
+            window.presenterApi.closeWindow();
+        } else {
+            window.close();
+        }
+        return;
+    }
     if (!slides.length) return;
     if (e.key === 'ArrowRight' || e.key === 'PageDown') {
         if (currentIndex < slides.length - 1) {
@@ -320,8 +325,6 @@ window.addEventListener('keydown', function(e) {
                 window.opener.postMessage({ type: 'navigateFromPopup', currentIndex }, '*');
             }
         }
-    } else if (e.key === 'Escape') {
-        window.close();
     }
 });
 </script>

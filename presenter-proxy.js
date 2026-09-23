@@ -8,6 +8,7 @@
     const data = e.data;
     if (!data || typeof data !== 'object') return;
     if (data.type !== 'presenterApiResponse') return;
+    if (e.source !== window.parent) return;
     const cb = pending.get(data.requestId);
     if (!cb) return;
     pending.delete(data.requestId);

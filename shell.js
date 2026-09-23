@@ -80,6 +80,10 @@
     presenterFont: 'settings_presenterFont',
     presenterBgImage: 'settings_presenterBgImage',
     presenterBgOpacity: 'settings_presenterBgOpacity',
+    bibleBgImage: 'settings_bibleBgImage',
+    bibleBgOpacity: 'settings_bibleBgOpacity',
+    hymnBgImage: 'settings_hymnBgImage',
+    hymnBgOpacity: 'settings_hymnBgOpacity',
     bibleFontMax: 'biblePresenterFontMax',
     bibleShowRef: 'settings_bibleShowRef',
     hymnAlign: 'settings_hymnAlign',
@@ -97,6 +101,10 @@
     presenterFont: "'Segoe UI', system-ui, sans-serif",
     presenterBgImage: '',
     presenterBgOpacity: 30,
+    bibleBgImage: '',
+    bibleBgOpacity: 30,
+    hymnBgImage: '',
+    hymnBgOpacity: 30,
     bibleFontMax: 800,
     bibleShowRef: 'true',
     hymnAlign: 'left',
@@ -116,6 +124,27 @@
 
   function saveSetting(key, value) {
     localStorage.setItem(key, String(value));
+  }
+
+  // Migrate the old shared background-image setting into separate per-module ones.
+  function migrateBgImageSettings() {
+    const legacyImg = localStorage.getItem(KEYS.presenterBgImage);
+    if (legacyImg) {
+      [{ key: KEYS.bibleBgImage, opacity: KEYS.bibleBgOpacity },
+       { key: KEYS.hymnBgImage, opacity: KEYS.hymnBgOpacity }].forEach((mod) => {
+        if (!localStorage.getItem(mod.key)) {
+          localStorage.setItem(mod.key, legacyImg);
+          const legacyOpacity = localStorage.getItem(KEYS.presenterBgOpacity);
+          if (legacyOpacity) localStorage.setItem(mod.opacity, legacyOpacity);
+        }
+      });
+    }
+  }
+  migrateBgImageSettings();
+
+  // ── Helpers ──
+  function isValidHexColor(color) {
+    return /^#[0-9a-fA-F]{6}$/.test(color);
   }
 
   // ── Color Palettes ──
@@ -195,16 +224,25 @@
       text: loadSetting(KEYS.presenterText, DEFAULTS.presenterText),
       weight: loadSetting(KEYS.presenterWeight, DEFAULTS.presenterWeight),
       font: loadSetting(KEYS.presenterFont, DEFAULTS.presenterFont),
-      bgImage: loadSetting(KEYS.presenterBgImage, DEFAULTS.presenterBgImage),
-      bgOpacity: Number(loadSetting(KEYS.presenterBgOpacity, DEFAULTS.presenterBgOpacity)),
+    };
+  }
+
+  function collectBgImage(module) {
+    return {
+      bgImage: loadSetting(module === 'bible' ? KEYS.bibleBgImage : KEYS.hymnBgImage, ''),
+      bgOpacity: Number(loadSetting(module === 'bible' ? KEYS.bibleBgOpacity : KEYS.hymnBgOpacity, DEFAULTS.bibleBgOpacity)),
     };
   }
 
   function pushSettingsToIframes() {
-    const s = collectPresenterSettings();
-    [bibleFrame, hymnFrame].forEach((frame) => {
+    const shared = collectPresenterSettings();
+    const targets = [
+      { frame: bibleFrame, msg: { type: 'settingsUpdate', ...shared, ...collectBgImage('bible') } },
+      { frame: hymnFrame, msg: { type: 'settingsUpdate', ...shared, ...collectBgImage('hymns') } },
+    ];
+    targets.forEach(({ frame, msg }) => {
       try {
-        frame.contentWindow?.postMessage({ type: 'settingsUpdate', ...s }, '*');
+        frame.contentWindow?.postMessage(msg, '*');
       } catch (e) {}
     });
   }
@@ -301,14 +339,17 @@
 
   if (bgColorPicker) {
     bgColorPicker.addEventListener('input', () => {
-      saveSetting(KEYS.presenterBg, bgColorPicker.value);
-      if (bgSwatches) {
-        bgSwatches.querySelectorAll('.swatch[data-color]').forEach((s) => {
-          s.classList.remove('active');
-        });
+      const value = bgColorPicker.value;
+      if (isValidHexColor(value)) {
+        saveSetting(KEYS.presenterBg, value);
+        if (bgSwatches) {
+          bgSwatches.querySelectorAll('.swatch[data-color]').forEach((s) => {
+            s.classList.remove('active');
+          });
+        }
+        syncPaletteGrid();
+        syncPreview();
       }
-      syncPaletteGrid();
-      syncPreview();
     });
   }
 
@@ -340,14 +381,17 @@
 
   if (textColorPicker) {
     textColorPicker.addEventListener('input', () => {
-      saveSetting(KEYS.presenterText, textColorPicker.value);
-      if (textSwatches) {
-        textSwatches.querySelectorAll('.swatch[data-color]').forEach((s) => {
-          s.classList.remove('active');
-        });
+      const value = textColorPicker.value;
+      if (isValidHexColor(value)) {
+        saveSetting(KEYS.presenterText, value);
+        if (textSwatches) {
+          textSwatches.querySelectorAll('.swatch[data-color]').forEach((s) => {
+            s.classList.remove('active');
+          });
+        }
+        syncPaletteGrid();
+        syncPreview();
       }
-      syncPaletteGrid();
-      syncPreview();
     });
   }
 
@@ -413,66 +457,98 @@
     });
   }
 
-  // ── Background Image ──
-  const bgImagePath = document.getElementById('bgImagePath');
-  const bgImageBrowse = document.getElementById('bgImageBrowse');
-  const bgImageClear = document.getElementById('bgImageClear');
-  const bgOpacityRow = document.getElementById('bgOpacityRow');
-  const bgOpacityRange = document.getElementById('bgOpacityRange');
-  const bgOpacityValue = document.getElementById('bgOpacityValue');
+  // ── Background Image (per module) ──
+  const BG_MODULES = [
+    {
+      module: 'bible',
+      pathId: 'bibleBgImagePath',
+      browseId: 'bibleBgImageBrowse',
+      clearId: 'bibleBgImageClear',
+      opacityRowId: 'bibleBgOpacityRow',
+      opacityRangeId: 'bibleBgOpacityRange',
+      opacityValueId: 'bibleBgOpacityValue',
+    },
+    {
+      module: 'hymns',
+      pathId: 'hymnBgImagePath',
+      browseId: 'hymnBgImageBrowse',
+      clearId: 'hymnBgImageClear',
+      opacityRowId: 'hymnBgOpacityRow',
+      opacityRangeId: 'hymnBgOpacityRange',
+      opacityValueId: 'hymnBgOpacityValue',
+    },
+  ];
 
-  function syncBgImageUI() {
-    const imgPath = loadSetting(KEYS.presenterBgImage, DEFAULTS.presenterBgImage);
-    const opacity = Number(loadSetting(KEYS.presenterBgOpacity, DEFAULTS.presenterBgOpacity));
+  const bgModules = BG_MODULES.map((cfg) => {
+    const els = {
+      path: document.getElementById(cfg.pathId),
+      browse: document.getElementById(cfg.browseId),
+      clear: document.getElementById(cfg.clearId),
+      opacityRow: document.getElementById(cfg.opacityRowId),
+      opacityRange: document.getElementById(cfg.opacityRangeId),
+      opacityValue: document.getElementById(cfg.opacityValueId),
+    };
+    const isBible = cfg.module === 'bible';
+    const imgKey = isBible ? KEYS.bibleBgImage : KEYS.hymnBgImage;
+    const opKey = isBible ? KEYS.bibleBgOpacity : KEYS.hymnBgOpacity;
+    const defaultOpacity = isBible ? DEFAULTS.bibleBgOpacity : DEFAULTS.hymnBgOpacity;
 
-    if (bgImagePath) {
-      if (imgPath) {
-        const parts = imgPath.replace(/\\/g, '/').split('/');
-        bgImagePath.textContent = parts[parts.length - 1];
-        bgImagePath.classList.add('has-image');
-      } else {
-        bgImagePath.textContent = 'No image selected';
-        bgImagePath.classList.remove('has-image');
+    const sync = () => {
+      const imgPath = loadSetting(imgKey, '');
+      const opacity = Number(loadSetting(opKey, defaultOpacity));
+      if (els.path) {
+        if (imgPath) {
+          const parts = imgPath.replace(/\\/g, '/').split('/');
+          els.path.textContent = parts[parts.length - 1];
+          els.path.classList.add('has-image');
+        } else {
+          els.path.textContent = 'No image selected';
+          els.path.classList.remove('has-image');
+        }
       }
+      if (els.clear) els.clear.hidden = !imgPath;
+      if (els.opacityRow) els.opacityRow.hidden = !imgPath;
+      if (els.opacityRange) els.opacityRange.value = opacity;
+      if (els.opacityValue) els.opacityValue.textContent = opacity + '%';
+    };
+
+    if (els.browse) {
+      els.browse.addEventListener('click', async () => {
+        const api = window.presenterApi;
+        if (!api || !api.pickBackgroundImage) {
+          alert('File picker not available.');
+          return;
+        }
+        const filePath = await api.pickBackgroundImage();
+        if (filePath) {
+          saveSetting(imgKey, filePath);
+          sync();
+        }
+      });
     }
 
-    if (bgImageClear) bgImageClear.hidden = !imgPath;
-    if (bgOpacityRow) bgOpacityRow.hidden = !imgPath;
-    if (bgOpacityRange) bgOpacityRange.value = opacity;
-    if (bgOpacityValue) bgOpacityValue.textContent = opacity + '%';
-  }
+    if (els.clear) {
+      els.clear.addEventListener('click', () => {
+        saveSetting(imgKey, '');
+        sync();
+      });
+    }
 
-  if (bgImageBrowse) {
-    bgImageBrowse.addEventListener('click', async () => {
-      const api = window.presenterApi;
-      if (!api || !api.pickBackgroundImage) {
-        alert('File picker not available.');
-        return;
-      }
-      const filePath = await api.pickBackgroundImage();
-      if (filePath) {
-        saveSetting(KEYS.presenterBgImage, filePath);
-        syncBgImageUI();
-      }
-    });
-  }
+    if (els.opacityRange) {
+      els.opacityRange.addEventListener('input', () => {
+        const val = Number(els.opacityRange.value);
+        if (els.opacityValue) els.opacityValue.textContent = val + '%';
+      });
+      els.opacityRange.addEventListener('change', () => {
+        saveSetting(opKey, Number(els.opacityRange.value));
+      });
+    }
 
-  if (bgImageClear) {
-    bgImageClear.addEventListener('click', () => {
-      saveSetting(KEYS.presenterBgImage, '');
-      syncBgImageUI();
-    });
-  }
+    return { module: cfg.module, sync };
+  });
 
-  if (bgOpacityRange) {
-    bgOpacityRange.addEventListener('input', () => {
-      const val = Number(bgOpacityRange.value);
-      if (bgOpacityValue) bgOpacityValue.textContent = val + '%';
-    });
-    bgOpacityRange.addEventListener('change', () => {
-      const val = Number(bgOpacityRange.value);
-      saveSetting(KEYS.presenterBgOpacity, val);
-    });
+  function syncBgImageUI() {
+    bgModules.forEach((m) => m.sync());
   }
 
   // ── Bible Max Font Size ──
@@ -521,6 +597,7 @@
     bibleShowRef.addEventListener('change', () => {
       saveSetting(KEYS.bibleShowRef, String(bibleShowRef.checked));
       syncPreview();
+      pushBibleSettings();
     });
   }
 
@@ -705,6 +782,7 @@
     // Switch preview content based on active panel
     if (previewThemeBible) previewThemeBible.hidden = activePanel === 'hymns';
     if (previewHymn) previewHymn.hidden = activePanel !== 'hymns';
+    if (settingsPreview) settingsPreview.classList.toggle('hymn-preview', activePanel === 'hymns');
     if (previewMeta) previewMeta.hidden = activePanel === 'hymns';
 
     // Always apply bg/color to the preview container
@@ -715,16 +793,25 @@
 
     if (activePanel === 'hymns') {
       // Hymn preview
+      const align = loadSetting(KEYS.hymnAlign, DEFAULTS.hymnAlign);
+      const titleSize = Number(loadSetting(KEYS.hymnTitleSize, DEFAULTS.hymnTitleSize)) || 7;
       if (previewHymnNum) {
         previewHymnNum.style.fontFamily = font;
+        previewHymnNum.style.fontWeight = weight;
+        previewHymnNum.style.textAlign = align;
       }
       if (previewHymnTitle) {
         previewHymnTitle.style.fontFamily = font;
         previewHymnTitle.style.fontWeight = weight;
+        previewHymnTitle.style.textAlign = align;
+        previewHymnTitle.style.fontSize = titleSize + 'cqw';
       }
       if (previewHymnVerse) {
         previewHymnVerse.style.fontFamily = font;
         previewHymnVerse.style.fontWeight = weight;
+        previewHymnVerse.style.textAlign = align;
+        const len = (previewHymnVerse.textContent || '').length;
+        previewHymnVerse.style.fontSize = (len < 80 ? 3.4 : 2.5) + 'cqw';
       }
     } else {
       // Theme/Bible preview
@@ -805,7 +892,12 @@
     });
   }
 
-  // Push initial settings to iframes on load
+  // Push initial settings to iframes (immediate + on load)
+  pushSettingsToIframes();
+  pushBibleMaxFont();
+  pushBibleSettings();
+  pushHymnSettings();
+
   [bibleFrame, hymnFrame].forEach((frame) => {
     frame.addEventListener('load', () => {
       pushSettingsToIframes();
@@ -822,6 +914,7 @@
     const data = e.data;
     if (!data || typeof data !== 'object') return;
     if (data.type !== 'presenterApiRequest') return;
+    if (e.source !== bibleFrame.contentWindow && e.source !== hymnFrame.contentWindow) return;
 
     const { requestId, method, args } = data;
     const respond = (result, error) => {

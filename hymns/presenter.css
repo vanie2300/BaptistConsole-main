@@ -21,8 +21,6 @@
   --bar-bg: var(--surface);
   --bar-text: var(--text);
 
-  --current-slide-height: 420px;
-  --next-slide-height: 270px;
   --thumbnail-height: 140px;
 }
 
@@ -195,10 +193,12 @@ body {
 
 .present-status::before {
   content: "";
-  width: 8px;
-  height: 8px;
+  width: 9px;
+  height: 9px;
   border-radius: 50%;
   background: var(--text-muted);
+  box-shadow: inset 0 0 2px rgba(0, 0, 0, 0.4);
+  transition: background 0.2s ease, box-shadow 0.2s ease;
 }
 
 .present-status.is-active {
@@ -207,7 +207,16 @@ body {
 
 .present-status.is-active::before {
   background: var(--accent-success);
-  box-shadow: 0 0 0 4px var(--accent-success-soft);
+  animation: ledPulse 1.6s ease-in-out infinite;
+}
+
+@keyframes ledPulse {
+  0%, 100% {
+    box-shadow: 0 0 4px 1px var(--accent-success-soft);
+  }
+  50% {
+    box-shadow: 0 0 12px 4px var(--accent-success-soft);
+  }
 }
 
 .presenter-pill {
@@ -229,7 +238,7 @@ body {
 }
 
 .presenter-select {
-  width: 220px;
+  width: 150px;
   padding: 6px 12px;
   border-radius: 12px;
   border: 1px solid var(--control-border);
@@ -443,8 +452,8 @@ body {
   display: grid;
   grid-template-columns: 1.45fr 1fr;
   gap: 18px;
-  align-items: start;
-  flex: 0 0 auto;
+  align-items: stretch;
+  flex: 1 1 auto;
   min-height: 0;
   margin-bottom: 10px;
 }
@@ -454,8 +463,8 @@ body {
   border-radius: 16px;
   background: var(--panel-elevated);
   padding: 18px;
-  min-height: 0;
-  height: var(--current-slide-height);
+  min-height: 260px;
+  height: auto;
   display: flex;
   align-items: center;
   justify-content: center;
@@ -464,9 +473,17 @@ body {
   overflow: auto;
 }
 
+.preview-grid > .slide-frame {
+  justify-self: center;
+  align-self: center;
+  width: calc(100% - 28px);
+  height: calc(100% - 28px);
+  min-height: 0;
+}
+
 .slide-frame.small {
   min-height: 0;
-  height: var(--next-slide-height);
+  height: clamp(180px, 26vh, 250px);
   align-items: flex-start;
   overflow: auto;
 }
@@ -475,11 +492,15 @@ body {
   display: flex;
   flex-direction: column;
   gap: 12px;
-  align-self: flex-start;
+  height: 100%;
   min-height: 0;
 }
 
 .right-stack .slide-frame.small {
+  flex: 0 0 auto;
+}
+
+.right-stack .present-controls {
   flex: 0 0 auto;
 }
 

@@ -1,5 +1,13 @@
 ﻿// ======== GLOBAL STATE ========
 
+function safeJsonStringify(obj) {
+  return JSON.stringify(obj).replace(/</g, "\\u003c");
+}
+
+function safeCss(value) {
+  return String(value == null ? "" : value).replace(/[<>;{}]/g, "");
+}
+
 let bibleFlat = null;              // flat JSON from kjv1611.json
 let bible = {};                    // structured: bible[bookSlug][chapter][verse]
 let bookMeta = {};                 // bookSlug -> { displayName, chapters: [], verseCounts: {} }
@@ -184,16 +192,17 @@ function wireEvents() {
   window.addEventListener("message", (e) => {
     const data = e.data;
     if (!data || typeof data !== "object") return;
-    if (data.type === "bibleMaxFontUpdate" && typeof data.maxFont === "number") {
+    const isFromParent = e.source === window.parent;
+    if (data.type === "bibleMaxFontUpdate" && typeof data.maxFont === "number" && isFromParent) {
       presenterFontMax = data.maxFont;
     }
-    if (data.type === "bibleSettingsUpdate") {
+    if (data.type === "bibleSettingsUpdate" && isFromParent) {
       if (typeof data.showRef === 'boolean') {
         var refEl = document.getElementById('presentRef');
         if (refEl) refEl.style.display = data.showRef ? '' : 'none';
       }
     }
-    if ((data.type === "settingsUpdate" || data.type === "bibleSettingsUpdate" || data.type === "hymnSettingsUpdate") && presentWindow && !presentWindow.closed) {
+    if ((data.type === "settingsUpdate" || data.type === "bibleSettingsUpdate" || data.type === "bibleMaxFontUpdate") && isFromParent && presentWindow && !presentWindow.closed) {
       presentWindow.postMessage(data, "*");
     }
   });
@@ -268,14 +277,8 @@ function initPresenterDisplayPicker() {
   const storedId = stored ? Number(stored) : null;
   let autoLabel = "";
 
-  const formatLabel = (display, index) => {
-    const size = display.size || display.bounds || {};
-    const labelBase = display.isPrimary ? "Primary" : `Display ${index + 1}`;
-    if (size.width && size.height) {
-      return `${labelBase} (${size.width}x${size.height})`;
-    }
-    return labelBase;
-  };
+const formatLabel = (display, index) =>
+    display.isPrimary ? "Primary" : `Display ${index + 1}`;
 
   const pickAutoDisplay = (displays) =>
     displays.find((display) => !display.isPrimary) || displays[0] || null;
@@ -729,7 +732,7 @@ function maybePreviewVerse(verseData, force = false) {
     return;
   }
   updateVerseDisplay(verseData);
-  if (previewOnSelect && isPresenterOpen()) {
+  if ((previewOnSelect || force) && isPresenterOpen()) {
     const location = getCurrentLocation();
     if (location) {
       setLiveVerse(location.book, location.chapter, location.verse);
@@ -774,7 +777,15 @@ function runSearch() {
     } else {
       setSearchHint(`Found ${query}.`);
     }
-  } else {
+} else {
+    if (scope === "book" && !currentBook) {
+      setSearchHint('Select a book first.');
+      return;
+    }
+    if (scope === "chapter" && !currentChapter) {
+      setSearchHint('Select a chapter first.');
+      return;
+    }
     lastSearchQuery = query;
     searchResults = keywordSearch(query, scope);
     isSearchResultsMode = true;
@@ -1131,19 +1142,15 @@ function autoFitCenterText(maxPx = centerFontSizePx) {
 
 function setPresenterState(isOpen) {
   if (els.presentStatus) {
-    const base = isOpen ? "Presenter: On" : "Presenter: Off";
-    const label = presenterDisplayLabel
-      ? `${presenterDisplayIsAuto ? "Auto: " : ""}${presenterDisplayLabel}`
-      : "";
-    const mode = `Size: Auto (${Math.round(presenterFitBias * 100)}%)`;
-    const displayPart = label ? `${label} | ` : "";
-    els.presentStatus.textContent = `${base} | ${displayPart}${mode}`;
+    const base = isOpen ? "On" : "Off";
+    const mode = `${Math.round(presenterFitBias * 100)}%`;
+    els.presentStatus.textContent = [base, presenterDisplayLabel, mode].filter(Boolean).join(" · ");
     els.presentStatus.classList.toggle("is-active", isOpen);
   }
   if (els.fontAuto) {
     els.fontAuto.classList.toggle("active", Math.abs(presenterFitBias - PRESENTER_BIAS_DEFAULT) < 0.01);
   }
-  if (els.displayBtn) {
+if (els.displayBtn) {
     els.displayBtn.textContent = isOpen ? "Display Active" : "Display Verse";
   }
 }
@@ -1207,11 +1214,11 @@ function openPresenterWindow() {
   <title>Bible Presenter</title>
   <style>
     :root {
-      --present-bg: ${(() => { try { return localStorage.getItem('settings_presenterBg') || '#000000'; } catch { return '#000000'; } })()};
-      --present-text: ${(() => { try { return localStorage.getItem('settings_presenterText') || '#ffffff'; } catch { return '#ffffff'; } })()};
+      --present-bg: ${safeCss((() => { try { return localStorage.getItem('settings_presenterBg') || '#000000'; } catch { return '#000000'; } })())};
+      --present-text: ${safeCss((() => { try { return localStorage.getItem('settings_presenterText') || '#ffffff'; } catch { return '#ffffff'; } })())};
       --present-accent: #60a5fa;
-      --present-weight: ${(() => { try { return localStorage.getItem('settings_presenterWeight') || '600'; } catch { return '600'; } })()};
-      --present-font: ${(() => { try { return localStorage.getItem('settings_presenterFont') || "'Segoe UI', system-ui, sans-serif"; } catch { return "'Segoe UI', system-ui, sans-serif"; } })()};
+      --present-weight: ${safeCss((() => { try { return localStorage.getItem('settings_presenterWeight') || '600'; } catch { return '600'; } })())};
+      --present-font: ${safeCss((() => { try { return localStorage.getItem('settings_presenterFont') || "'Segoe UI', system-ui, sans-serif"; } catch { return "'Segoe UI', system-ui, sans-serif"; } })())};
     }
     .theme-dark { --present-accent: #60a5fa; }
     .theme-light { --present-accent: #1a73e8; }
@@ -1272,7 +1279,13 @@ function openPresenterWindow() {
       document.documentElement.classList.toggle('theme-light', theme === 'light');
     }
 
+    function fileUrlCss(path) {
+      const bs = String.fromCharCode(92);
+      return 'url("file:///' + String(path).split(bs).join('/').replace(/[()'"]/g, (ch) => bs + ch) + '")';
+    }
+
     function applyPresenterSettings(s) {
+      s = s || {};
       const root = document.documentElement;
       if (s.bg) root.style.setProperty('--present-bg', s.bg);
       if (s.text) root.style.setProperty('--present-text', s.text);
@@ -1291,7 +1304,7 @@ function openPresenterWindow() {
       var bgLayer = document.getElementById('bgImageLayer');
       if (bgLayer) {
         if (s.bgImage) {
-          bgLayer.style.backgroundImage = 'url("file:///' + s.bgImage.replace(/\\\\/g, '/').replace(/"/g, '\\\\"') + '")';
+          bgLayer.style.backgroundImage = fileUrlCss(s.bgImage);
           bgLayer.style.opacity = String((s.bgOpacity || 30) / 100);
           bgLayer.style.display = 'block';
         } else {
@@ -1303,6 +1316,7 @@ function openPresenterWindow() {
 
     window.addEventListener('message', function(evt) {
       if (!evt.data) return;
+      if (evt.source !== window.opener) return;
       if (evt.data.type === 'settingsUpdate') {
         applyPresenterSettings(evt.data);
       }
@@ -1312,22 +1326,14 @@ function openPresenterWindow() {
           if (refEl) refEl.style.display = evt.data.showRef ? '' : 'none';
         }
       }
+      if (evt.data.type === 'bibleMaxFontUpdate' && typeof evt.data.maxFont === 'number') {
+        FIT_FONT_MAX = evt.data.maxFont;
+        schedulePresenterFit();
+      }
     });
 
 
-    function requestFullscreenSafe() {
-      try {
-        if (document.fullscreenElement) return;
-        const el = document.documentElement;
-        if (el.requestFullscreen) {
-          el.requestFullscreen().catch(() => {});
-        }
-      } catch (err) {
-        // Ignore fullscreen errors (browser policy, etc).
-      }
-    }
-
-    const isElectron = navigator.userAgent.toLowerCase().includes('electron');
+const isElectron = navigator.userAgent.toLowerCase().includes('electron');
     function maximizeWindow() {
       if (isElectron) return;
       try {
@@ -1339,7 +1345,7 @@ function openPresenterWindow() {
     }
 
     const FIT_FONT_MIN = ${PRESENTER_FONT_MIN};
-    const FIT_FONT_MAX = ${presenterFontMax};
+    let FIT_FONT_MAX = ${presenterFontMax};
     const FIT_BIAS_MIN = ${PRESENTER_BIAS_MIN};
     const FIT_BIAS_MAX = ${PRESENTER_BIAS_MAX};
 
@@ -1354,11 +1360,7 @@ function openPresenterWindow() {
 
     function parsePx(value, fallback) {
       const num = Number.parseFloat(value);
-      return Number.isFinite(num) ? num : fallback;
-    }
-
-    function overflows(textEl, availableWidth, availableHeight) {
-      return textEl.scrollHeight > availableHeight || textEl.scrollWidth > availableWidth;
+return Number.isFinite(num) ? num : fallback;
     }
 
     function getAvailableSpace(refEl) {
@@ -1444,8 +1446,8 @@ function openPresenterWindow() {
       const verseText = textEl.textContent || '';
       const verseLen = verseText.length;
       if (verseLen > 0 && verseLen < 80) {
-        const cap = Math.round(150 + (verseLen / 80) * 300);
-        best = Math.min(best, cap);
+        const shortCap = Math.round(dynamicMaxBase * 0.55);
+        best = Math.min(best, shortCap);
       }
 
       textEl.style.fontSize = best + 'px';
@@ -1472,8 +1474,9 @@ function openPresenterWindow() {
       }
       schedulePresenterFit();
     }
-    window.addEventListener('message', function(evt) {
+window.addEventListener('message', function(evt) {
       if (!evt.data || evt.data.type !== 'verseUpdate') return;
+      if (evt.source !== window.opener) return;
       updateVerse(evt.data);
     });
     window.addEventListener('storage', function(evt) {
@@ -1481,15 +1484,26 @@ function openPresenterWindow() {
         applyThemeFromStorage();
       }
     });
-    window.addEventListener('keydown', function(evt) {
-      if (evt.key === 'Escape') {
+document.addEventListener('keydown', function(evt) {
+      if (evt.key !== 'Escape') return;
+      evt.preventDefault();
+      evt.stopPropagation();
+      if (document.fullscreenElement && document.exitFullscreen) {
+        try { document.exitFullscreen(); } catch (err) {}
+      }
+      if (window.presenterApi && window.presenterApi.closeWindow) {
+        window.presenterApi.closeWindow();
+      } else {
         window.close();
       }
-    });
-    window.addEventListener('load', function() {
+    }, true);
+window.addEventListener('load', function() {
       applyThemeFromStorage();
-      maximizeWindow();
-      requestFullscreenSafe();
+      applyPresenterSettings({
+        bgImage: localStorage.getItem('settings_bibleBgImage') || localStorage.getItem('settings_presenterBgImage') || '',
+        bgOpacity: Number(localStorage.getItem('settings_bibleBgOpacity') || localStorage.getItem('settings_presenterBgOpacity')) || 30,
+      });
+maximizeWindow();
       schedulePresenterFit();
     });
     window.addEventListener('resize', function() {
@@ -1504,13 +1518,12 @@ function openPresenterWindow() {
     window.addEventListener('beforeunload', function() {
       clearFitQueue();
     });
-    window.addEventListener('click', requestFullscreenSafe);
     (function() {
       var showRef = localStorage.getItem('settings_bibleShowRef');
       var refEl = document.getElementById('presentRef');
       if (refEl && showRef === 'false') refEl.style.display = 'none';
     })();
-    updateVerse(${JSON.stringify({
+updateVerse(${safeJsonStringify({
       reference: initialRef,
       text: initialText,
       size: initialSize,

@@ -47,19 +47,18 @@
         <div>
           <p class="app-subtitle">Preview</p>
           <h2 class="app-title">Hymn Presenter</h2>
-          <p class="muted">Select a hymn, navigate slides, and present.</p>
+          <p class="muted">Select a hymn, then present.</p>
         </div>
-          <div class="presenter-controls" data-ui="hymn-present-controls">
+<div class="presenter-controls" data-ui="hymn-present-controls">
             <div class="presenter-display" id="presenterDisplayWrap" data-ui="hymn-presenter-display-select" hidden>
               <div class="presenter-pill" data-ui="hymn-presenter-display-pill">
-                <span class="presenter-label">Presenter</span>
                 <select id="presenterDisplayPicker" class="presenter-select">
-                  <option value="">Default Display</option>
+                  <option value="">Auto</option>
                 </select>
               </div>
             </div>
             <button class="present-button" id="presentBtn" data-ui="hymn-present-button" disabled>Present</button>
-            <div class="present-status" id="presentStatus">Presenter: Off</div>
+            <div class="present-status" id="presentStatus">Off</div>
           </div>
       </header>
 

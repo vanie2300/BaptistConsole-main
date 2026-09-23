@@ -52,7 +52,7 @@
         </div>
       </section>
 
-      <!-- PRESENT BUTTONS -->
+<!-- PRESENT BUTTONS -->
       <section class="present-section" data-ui="bible-present-controls">
         <div class="present-actions" data-ui="bible-display-action">
           <button id="displayBtn" class="present-button" data-ui="bible-display-button" type="button">
@@ -60,18 +60,18 @@
           </button>
         </div>
         <label class="preview-toggle" data-ui="bible-auto-display-toggle" for="previewToggle">
+          <span>Auto display</span>
           <input id="previewToggle" data-ui="bible-auto-display-input" type="checkbox" checked />
-          <span>Auto-display on select</span>
         </label>
-        <div class="present-status" id="presentStatus">Presenter: Off</div>
         <div class="control-block presenter-display" id="presenterDisplayWrap" data-ui="bible-presenter-display-select" hidden>
-          <label for="presenterDisplayPicker" class="control-label">Presenter Display</label>
+          <label for="presenterDisplayPicker" class="control-label">Display</label>
           <select id="presenterDisplayPicker">
-            <option value="">Default Display</option>
+            <option value="">Auto</option>
           </select>
         </div>
+        <div class="present-status" id="presentStatus">Off</div>
         <p class="present-hint">
-          Preview in the center panel, then display on the presenter screen.
+          Preview, then display.
         </p>
       </section>
     </aside>
