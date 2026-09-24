@@ -23,6 +23,9 @@
   --control-hover: var(--surface-muted);
   --bar-bg: var(--surface);
   --bar-text: var(--text);
+
+  --accent-highlight: var(--highlight);
+  --accent-highlight-soft: var(--highlight-soft);
 }
 
 *,
@@ -575,7 +578,7 @@ select:disabled {
 }
 
 .current-reference {
-  font-size: 0.85rem;
+  font-size: 1rem;
   text-transform: uppercase;
   letter-spacing: 0.22em;
   color: var(--accent-soft);
@@ -771,6 +774,7 @@ select:disabled {
 .search-ref {
   color: var(--text-muted);
   font-weight: 600;
+  font-size: 0.95rem;
 }
 
 .search-highlight {

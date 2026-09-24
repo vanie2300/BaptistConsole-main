@@ -5,6 +5,9 @@
     currentSlide: document.getElementById('currentSlide'),
     nextSlide: document.getElementById('nextSlide'),
     thumbnails: document.getElementById('thumbnails'),
+    currentHymnTitle: document.getElementById('currentHymnTitle'),
+    currentHymnVerse: document.getElementById('currentHymnVerse'),
+    currentHymnTotal: document.getElementById('currentHymnTotal'),
     presentBtn: document.getElementById('presentBtn'),
     presentStatus: document.getElementById('presentStatus'),
     prevBtn: document.getElementById('prevBtn'),
@@ -46,7 +49,7 @@
 
 const setPresenterState = (isOpen) => {
     if (refs.presentStatus) {
-      const parts = [isOpen ? 'On' : 'Off'];
+      const parts = [isOpen ? 'Live' : 'Off'];
       if (presenterDisplayLabel) parts.push(presenterDisplayLabel);
       refs.presentStatus.textContent = parts.join(' · ');
       refs.presentStatus.classList.toggle('is-active', isOpen);
@@ -124,31 +127,37 @@ const getHymnSettings = () => ({
     wrapper.className = 'resizable-text';
     const settings = getHymnSettings();
     wrapper.style.textAlign = settings.align;
+    if (settings.layout === 'compact' && mode !== 'thumb') {
+      wrapper.style.maxWidth = '70%';
+    }
     if (slide.type === 'title') {
-      const titleSize = mode === 'thumb' ? 7 : settings.titleSize;
-      wrapper.innerHTML = `<div class="slide-title" style="font-size:${titleSize}vw">${escapeHtml(slide.title)}</div>`;
+      const titleSizeStyle =
+        mode === 'thumb'
+          ? 'font-size:inherit'
+          : `font-size:${settings.titleSize}vw`;
+      wrapper.innerHTML = `<div class="slide-title" style="${titleSizeStyle}">${escapeHtml(slide.title)}</div>`;
     } else {
       const label = slide.type === 'chorus' ? 'Chorus' : `Verse ${slide.number}`;
       const content = (slide.lines || []).map(escapeHtml).join('<br>');
       wrapper.innerHTML = `${settings.showNumbers ? `<div class="verse-label">${label}</div>` : ''}${content}`;
     }
 
-    const textLength = wrapper.textContent.length;
     let fontSize;
-    if (mode === 'current') fontSize = textLength < 80 ? '3vw' : '2.2vw';
-    else if (mode === 'next') fontSize = textLength < 80 ? '1.8vw' : '1.2vw';
-    else fontSize = textLength > 150 ? '0.65rem' : '0.8rem';
+    if (mode === 'current') fontSize = '3vw';
+    else if (mode === 'next') fontSize = '1.4rem';
+    else fontSize = '0.8rem';
     wrapper.style.fontSize = fontSize;
     return wrapper.outerHTML;
   };
 
-  const renderList = () => {
+const renderList = () => {
     refs.hymnList.innerHTML = '';
+    const query = refs.search.value.trim();
     state.filtered.forEach((hymn, idx) => {
       const row = document.createElement('button');
       row.className = 'hymn-row';
       row.type = 'button';
-      row.textContent = hymn.title;
+      row.innerHTML = highlightMatch(hymn.title, query);
       if (state.selectedId && (hymn.id === state.selectedId || hymn.title === state.selectedId)) {
         row.classList.add('active');
       }
@@ -157,13 +166,35 @@ const getHymnSettings = () => ({
     });
   };
 
+  const highlightMatch = (text, query) => {
+    if (!query) return escapeHtml(text);
+    const escaped = query.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+    return escapeHtml(text).replace(
+      new RegExp(`(${escaped})`, 'ig'),
+      '<mark class="search-match">$1</mark>'
+    );
+  };
+
   const renderSlides = () => {
     if (!state.slides.length) return;
     const current = state.slides[state.currentIndex] || { lines: ['End of hymn'] };
     const next = state.slides[state.currentIndex + 1];
 
     refs.currentSlide.innerHTML = slideToHtml(current, 'current');
+    if (current.type === 'title') {
+      fitCurrentTitle();
+    } else {
+      fitFrameText(refs.currentSlide, 14);
+    }
     refs.nextSlide.innerHTML = next ? slideToHtml(next, 'next') : '<em>End of hymn</em>';
+    fitFrameText(refs.nextSlide, 11);
+    if (refs.currentHymnVerse) {
+      const label =
+        current.type === 'title' ? 'Title' :
+        current.type === 'chorus' ? 'Chorus' :
+        current.type === 'verse' ? `Verse ${current.number}` : '—';
+      refs.currentHymnVerse.textContent = label;
+    }
 
     refs.thumbnails.innerHTML = '';
     state.slides.slice(state.currentIndex + 2, state.currentIndex + 8).forEach((slide) => {
@@ -177,6 +208,58 @@ const getHymnSettings = () => ({
     refs.nextBtn.disabled = state.currentIndex >= state.slides.length - 1;
     refs.presentBtn.disabled = false;
     updateDeleteState();
+  };
+
+  const fitCurrentTitle = () => {
+    const title = refs.currentSlide.querySelector('.slide-title');
+    if (!title) return;
+    let size = getHymnSettings().titleSize;
+    const frameStyle = getComputedStyle(refs.currentSlide);
+    const availW =
+      refs.currentSlide.clientWidth -
+      parseFloat(frameStyle.paddingLeft) -
+      parseFloat(frameStyle.paddingRight);
+    const availH =
+      refs.currentSlide.clientHeight -
+      parseFloat(frameStyle.paddingTop) -
+      parseFloat(frameStyle.paddingBottom);
+    if (!availW || !availH) return;
+    title.style.fontSize = size + 'vw';
+    while (
+      size > 4 &&
+      (title.scrollWidth > availW || title.offsetHeight > availH)
+    ) {
+      size = Math.round((size - 0.25) * 100) / 100;
+      title.style.fontSize = size + 'vw';
+    }
+  };
+
+  const fitFrameText = (frame, minSize = 11) => {
+    if (!frame) return;
+    const text = frame.querySelector('.resizable-text');
+    if (!text) return;
+    const frameStyle = getComputedStyle(frame);
+    const availW =
+      frame.clientWidth -
+      parseFloat(frameStyle.paddingLeft) -
+      parseFloat(frameStyle.paddingRight);
+    const availH =
+      frame.clientHeight -
+      parseFloat(frameStyle.paddingTop) -
+      parseFloat(frameStyle.paddingBottom);
+    if (!availW || !availH) return;
+    const base = parseFloat(getComputedStyle(text).fontSize) || 16;
+    let size = base;
+    text.style.fontSize = size + 'px';
+    let guard = 0;
+    while (
+      size > minSize &&
+      (text.scrollHeight > availH || text.scrollWidth > availW) &&
+      guard++ < 60
+    ) {
+      size = Math.round((size - 0.5) * 100) / 100;
+      text.style.fontSize = size + 'px';
+    }
   };
 
   const navigate = (step) => {
@@ -196,6 +279,8 @@ const getHymnSettings = () => ({
     state.selectedId = hymn.id ?? hymn.title;
     state.slides = buildSlides(hymn);
     state.currentIndex = 0;
+    if (refs.currentHymnTitle) refs.currentHymnTitle.textContent = hymn.title;
+    if (refs.currentHymnTotal) refs.currentHymnTotal.textContent = String((hymn.verses || []).length);
     renderSlides();
     renderList();
     updateDeleteState();
@@ -341,8 +426,8 @@ const handleMessage = (event) => {
 
 state.hymns.push(newHymn);
     state.hymns.sort((a, b) => a.title.localeCompare(b.title));
-    state.filtered = [...state.hymns];
-    renderList();
+    refs.search.value = '';
+    filterList();
     setStatus(`Added "${newHymn.title}". Saving hymns.json...`);
     try {
       await persistHymns();
@@ -350,7 +435,6 @@ state.hymns.push(newHymn);
     } catch (err) {
       console.error(err);
       state.hymns = state.hymns.filter((h) => h !== newHymn);
-      state.filtered = state.filtered.filter((h) => h !== newHymn);
       if (state.selectedId === (newHymn.id ?? newHymn.title)) {
         state.selectedId = null;
         state.selectedIndex = null;
@@ -362,8 +446,7 @@ state.hymns.push(newHymn);
         refs.nextBtn.disabled = true;
         refs.presentBtn.disabled = true;
       }
-      renderList();
-      updateDeleteState();
+      filterList();
       setStatus('Could not save hymns.json; hymn rolled back.', true);
     }
     closeModal();
@@ -433,14 +516,12 @@ setStatus(`Deleted "${hymn.title}". Saving hymns.json...`);
       console.error(err);
       state.hymns.push(hymn);
       state.hymns.sort((a, b) => a.title.localeCompare(b.title));
-      state.filtered = [...state.hymns];
+      filterList();
       const restoredIndex = state.filtered.findIndex((h) => h === hymn);
       if (restoredIndex >= 0) {
         state.selectedIndex = restoredIndex;
         state.selectedId = hymn.id ?? hymn.title;
         selectHymn(restoredIndex);
-      } else {
-        renderList();
       }
       setStatus('Could not save hymns.json; deletion rolled back.', true);
     }
@@ -512,7 +593,7 @@ const formatLabel = (display, index) =>
         presenterAutoDisplayLabel = autoLabel;
       }
 
-      if (storedId) {
+if (storedId) {
         const storedDisplay = displays.find((display) => display.id === storedId);
         if (storedDisplay) {
           presenterDisplayIsAuto = false;
@@ -523,17 +604,18 @@ const formatLabel = (display, index) =>
           refs.presenterDisplayPicker.value = String(storedId);
           api.setPresenterDisplay(storedId);
         } else {
+          localStorage.removeItem('presenterDisplayId');
           presenterDisplayIsAuto = true;
           presenterDisplayLabel = presenterAutoDisplayLabel;
+          refs.presenterDisplayPicker.value = '';
           if (presenterAutoDisplayId) {
-            refs.presenterDisplayPicker.value = String(presenterAutoDisplayId);
             api.setPresenterDisplay(presenterAutoDisplayId);
           }
         }
       } else if (presenterAutoDisplayId) {
         presenterDisplayIsAuto = true;
         presenterDisplayLabel = presenterAutoDisplayLabel;
-        refs.presenterDisplayPicker.value = String(presenterAutoDisplayId);
+        refs.presenterDisplayPicker.value = '';
         api.setPresenterDisplay(presenterAutoDisplayId);
       } else {
         presenterDisplayIsAuto = true;
@@ -577,9 +659,18 @@ const formatLabel = (display, index) =>
     });
   }
 
-  document.addEventListener('keydown', (e) => {
-    const isInput = ['INPUT', 'TEXTAREA'].includes(e.target.tagName);
-    if (isInput) return;
+document.addEventListener('keydown', (e) => {
+    const modalOpen = Boolean(refs.addModal && !refs.addModal.hidden);
+    if (e.key === 'Escape') {
+      if (modalOpen) {
+        e.preventDefault();
+        closeModal();
+      }
+      return;
+    }
+    if (modalOpen) return;
+    const tag = e.target && e.target.tagName;
+    if (['INPUT', 'TEXTAREA', 'SELECT', 'BUTTON'].includes(tag)) return;
     if (e.key === 'ArrowLeft') {
       e.preventDefault();
       navigate(-1);
@@ -589,8 +680,6 @@ const formatLabel = (display, index) =>
     } else if (e.key === 'Enter') {
       e.preventDefault();
       startPresentation();
-    } else if (e.key === 'Escape') {
-      closeModal();
     }
   });
 

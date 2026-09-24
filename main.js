@@ -215,7 +215,6 @@ function createMainWindow() {
       }
       const bounds = (target || screen.getPrimaryDisplay()).bounds;
       win.setBounds(bounds);
-      win.setAlwaysOnTop(true);
       win.focus();
     };
     if (win.webContents && typeof win.webContents.once === 'function') {

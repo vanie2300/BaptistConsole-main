@@ -221,6 +221,15 @@
                   <span class="settings-unit">px</span>
                 </div>
               </div>
+              <div class="settings-field">
+                <label class="settings-label" for="bibleRefSize">Reference Size</label>
+                <div class="settings-field-row">
+                  <input type="range" id="bibleRefSizeRange" min="50" max="200" step="5" value="100">
+                  <input type="number" id="bibleRefSize" min="50" max="200" step="5" value="100" class="settings-number">
+                  <span class="settings-unit">%</span>
+                </div>
+                <span class="settings-toggle-hint">Scale the verse reference on the projected display</span>
+              </div>
             </div>
           </div>
           <div class="settings-section">
@@ -369,6 +378,8 @@
 
     </div>
   </div>
+
+  <div class="toast-container" id="toastContainer" aria-live="polite"></div>
 
   <script src="theme.js?v=5"></script>
   <script src="shell.js?v=5"></script>

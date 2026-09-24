@@ -4,6 +4,9 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Hymn Presenter</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
   <link rel="stylesheet" href="../theme.css">
   <link rel="stylesheet" href="presenter.css">
   <script>
@@ -11,6 +14,8 @@
       const theme = localStorage.getItem('globalTheme');
       if (theme === 'dark') {
         document.documentElement.classList.add('theme-dark');
+      } else if (theme === 'light') {
+        document.documentElement.classList.add('theme-light');
       }
     })();
   </script>
@@ -41,39 +46,65 @@
       <div class="status" id="statusMessage" data-ui="hymn-status"></div>
     </aside>
 
-    <!-- UI GROUP: Preview Panel -->
-    <main class="panel panel-right" data-ui="hymn-preview-panel">
+<!-- UI GROUP: Center Preview Panel -->
+    <main class="panel panel-center" data-ui="hymn-preview-panel">
       <header class="panel-header" data-ui="hymn-preview-header">
         <div>
           <p class="app-subtitle">Preview</p>
           <h2 class="app-title">Hymn Presenter</h2>
           <p class="muted">Select a hymn, then present.</p>
         </div>
-<div class="presenter-controls" data-ui="hymn-present-controls">
-            <div class="presenter-display" id="presenterDisplayWrap" data-ui="hymn-presenter-display-select" hidden>
-              <div class="presenter-pill" data-ui="hymn-presenter-display-pill">
-                <select id="presenterDisplayPicker" class="presenter-select">
-                  <option value="">Auto</option>
-                </select>
-              </div>
+        <div class="header-controls" data-ui="hymn-header-controls">
+          <div class="presenter-display" id="presenterDisplayWrap" data-ui="hymn-presenter-display-select" hidden>
+            <div class="presenter-pill" data-ui="hymn-presenter-display-pill">
+              <select id="presenterDisplayPicker" class="presenter-select" aria-label="Presenter display">
+                <option value="">Auto</option>
+              </select>
             </div>
-            <button class="present-button" id="presentBtn" data-ui="hymn-present-button" disabled>Present</button>
-            <div class="present-status" id="presentStatus">Off</div>
           </div>
+          <div class="present-status" id="presentStatus">Off</div>
+        </div>
       </header>
 
-      <section class="preview-grid" data-ui="hymn-preview-grid">
+      <section class="preview-stage" data-ui="hymn-preview-grid">
         <div class="slide-frame" id="currentSlide" data-ui="hymn-preview-current"><em>Select a hymn...</em></div>
-        <div class="right-stack" data-ui="hymn-preview-side">
-          <div class="slide-frame small" id="nextSlide" data-ui="hymn-preview-next"></div>
-          <div class="present-controls" data-ui="hymn-nav-buttons">
-            <button class="nav-button" id="prevBtn" disabled>&#8592; Previous</button>
-            <button class="nav-button" id="nextBtn" disabled>Next &#8594;</button>
-          </div>
-        </div>
       </section>
-      <section class="thumbnails" id="thumbnails" data-ui="hymn-preview-thumbnails"></section>
+
+      <div class="present-row" data-ui="hymn-present-row">
+        <button class="present-button" id="presentBtn" data-ui="hymn-present-button" disabled>Present</button>
+      </div>
+
+      <div class="present-controls" data-ui="hymn-nav-buttons">
+        <button class="nav-button" id="prevBtn" disabled>&#8592; Previous</button>
+        <button class="nav-button" id="nextBtn" disabled>Next &#8594;</button>
+      </div>
     </main>
+
+    <!-- UI GROUP: Right Controls Panel -->
+    <aside class="panel panel-right" data-ui="hymn-side-panel">
+      <div class="info-card" data-ui="hymn-info-card">
+        <div class="info-card-label">Current Hymn</div>
+        <div class="hymn-title-text" id="currentHymnTitle">—</div>
+        <div class="info-row">
+          <span class="info-key">Current</span>
+          <span class="info-value" id="currentHymnVerse">—</span>
+        </div>
+        <div class="info-row">
+          <span class="info-key">Total</span>
+          <span class="info-value" id="currentHymnTotal">—</span>
+        </div>
+      </div>
+
+      <div class="verse-preview-block" data-ui="hymn-verse-preview">
+        <div class="info-card-label">Verse Preview</div>
+        <div class="slide-frame small" id="nextSlide" data-ui="hymn-preview-next"></div>
+      </div>
+
+      <div class="thumbnails-block" data-ui="hymn-preview-thumbnails">
+        <div class="info-card-label">Slides</div>
+        <section class="thumbnails" id="thumbnails" data-ui="hymn-preview-thumbnails-strip"></section>
+      </div>
+    </aside>
   </div>
   <!-- UI GROUP: Add Hymn Modal -->
   <div class="modal-overlay" id="addModal" data-ui="hymn-modal-overlay" hidden>

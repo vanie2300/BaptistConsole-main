@@ -86,6 +86,7 @@
     hymnBgOpacity: 'settings_hymnBgOpacity',
     bibleFontMax: 'biblePresenterFontMax',
     bibleShowRef: 'settings_bibleShowRef',
+    bibleRefSize: 'settings_bibleRefSize',
     hymnAlign: 'settings_hymnAlign',
     hymnLayout: 'settings_hymnLayout',
     hymnShowNumbers: 'settings_hymnShowNumbers',
@@ -107,6 +108,7 @@
     hymnBgOpacity: 30,
     bibleFontMax: 800,
     bibleShowRef: 'true',
+    bibleRefSize: '100',
     hymnAlign: 'left',
     hymnLayout: 'full',
     hymnShowNumbers: 'true',
@@ -138,6 +140,8 @@
           if (legacyOpacity) localStorage.setItem(mod.opacity, legacyOpacity);
         }
       });
+      localStorage.removeItem(KEYS.presenterBgImage);
+      localStorage.removeItem(KEYS.presenterBgOpacity);
     }
   }
   migrateBgImageSettings();
@@ -258,9 +262,10 @@
 
   function pushBibleSettings() {
     const showRef = loadSetting(KEYS.bibleShowRef, DEFAULTS.bibleShowRef) === 'true';
+    const refSize = Number(loadSetting(KEYS.bibleRefSize, DEFAULTS.bibleRefSize)) || 100;
     [bibleFrame, hymnFrame].forEach((frame) => {
       try {
-        frame.contentWindow?.postMessage({ type: 'bibleSettingsUpdate', showRef }, '*');
+        frame.contentWindow?.postMessage({ type: 'bibleSettingsUpdate', showRef, refSize }, '*');
       } catch (e) {}
     });
   }
@@ -601,6 +606,39 @@
     });
   }
 
+  // ── Bible Reference Size ──
+  const bibleRefSizeInput = document.getElementById('bibleRefSize');
+  const bibleRefSizeRange = document.getElementById('bibleRefSizeRange');
+
+  function syncBibleRefSizeUI() {
+    const val = Number(loadSetting(KEYS.bibleRefSize, DEFAULTS.bibleRefSize)) || 100;
+    if (bibleRefSizeInput) bibleRefSizeInput.value = val;
+    if (bibleRefSizeRange) bibleRefSizeRange.value = val;
+  }
+
+  function applyBibleRefSize(val) {
+    const clamped = Math.min(200, Math.max(50, Number(val) || 100));
+    saveSetting(KEYS.bibleRefSize, clamped);
+    syncBibleRefSizeUI();
+    syncPreview();
+    pushBibleSettings();
+  }
+
+  if (bibleRefSizeInput) {
+    bibleRefSizeInput.addEventListener('change', () => {
+      applyBibleRefSize(Number(bibleRefSizeInput.value));
+    });
+  }
+
+  if (bibleRefSizeRange) {
+    bibleRefSizeRange.addEventListener('input', () => {
+      if (bibleRefSizeInput) bibleRefSizeInput.value = bibleRefSizeRange.value;
+    });
+    bibleRefSizeRange.addEventListener('change', () => {
+      applyBibleRefSize(Number(bibleRefSizeRange.value));
+    });
+  }
+
   // ── Hymn Text Alignment ──
   const hymnAlignGroup = document.getElementById('hymnAlignGroup');
 
@@ -720,6 +758,7 @@
     syncBgImageUI();
     syncBibleMaxFontUI(loadSetting(KEYS.bibleFontMax, DEFAULTS.bibleFontMax));
     syncBibleShowRefUI();
+    syncBibleRefSizeUI();
     syncHymnAlignUI();
     syncHymnLayoutUI();
     syncHymnShowNumbersUI();
@@ -825,7 +864,9 @@
         previewLabel.style.fontWeight = weight;
       }
       if (previewRef) {
+        const refScale = Number(loadSetting(KEYS.bibleRefSize, DEFAULTS.bibleRefSize)) || 100;
         previewRef.style.fontFamily = font;
+        previewRef.style.fontSize = `calc(0.85rem * ${refScale} / 100)`;
         previewRef.hidden = activePanel === 'bible' && !showRef;
       }
 
@@ -842,6 +883,20 @@
   // ── Hook syncPreview into all appearance change handlers ──
 
   // ── Modal Open / Close ──
+  function showToast(message, type = 'success') {
+    const container = document.getElementById('toastContainer');
+    if (!container) return;
+    const toast = document.createElement('div');
+    toast.className = `toast toast-${type}`;
+    toast.textContent = message;
+    container.appendChild(toast);
+    requestAnimationFrame(() => toast.classList.add('show'));
+    setTimeout(() => {
+      toast.classList.remove('show');
+      setTimeout(() => toast.remove(), 300);
+    }, 2500);
+  }
+
   if (settingsBtn && settingsModal) {
     settingsBtn.addEventListener('click', (e) => {
       e.stopPropagation();
@@ -872,6 +927,7 @@
       pushBibleSettings();
       pushHymnSettings();
       settingsModal.hidden = true;
+      showToast('Settings saved');
     });
   }
 
@@ -889,6 +945,7 @@
       pushBibleMaxFont();
       pushBibleSettings();
       pushHymnSettings();
+      showToast('Settings reset to defaults', 'info');
     });
   }
 

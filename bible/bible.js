@@ -201,6 +201,10 @@ function wireEvents() {
         var refEl = document.getElementById('presentRef');
         if (refEl) refEl.style.display = data.showRef ? '' : 'none';
       }
+      if (typeof data.refSize === 'number') {
+        var consoleRef = document.getElementById('currentReference');
+        if (consoleRef) consoleRef.style.fontSize = `calc(1rem * ${data.refSize} / 100)`;
+      }
     }
     if ((data.type === "settingsUpdate" || data.type === "bibleSettingsUpdate" || data.type === "bibleMaxFontUpdate") && isFromParent && presentWindow && !presentWindow.closed) {
       presentWindow.postMessage(data, "*");
@@ -1142,7 +1146,7 @@ function autoFitCenterText(maxPx = centerFontSizePx) {
 
 function setPresenterState(isOpen) {
   if (els.presentStatus) {
-    const base = isOpen ? "On" : "Off";
+    const base = isOpen ? "Live" : "Off";
     const mode = `${Math.round(presenterFitBias * 100)}%`;
     els.presentStatus.textContent = [base, presenterDisplayLabel, mode].filter(Boolean).join(" · ");
     els.presentStatus.classList.toggle("is-active", isOpen);
@@ -1250,7 +1254,7 @@ function openPresenterWindow() {
       z-index: 1;
     }
     #presentRef {
-      font-size: clamp(0.58rem, 1vw, 0.9rem);
+      font-size: clamp(0.9rem, 1.8vw, 1.6rem);
       font-weight: 600;
       letter-spacing: 0.2em;
       text-transform: uppercase;
@@ -1324,6 +1328,10 @@ function openPresenterWindow() {
         if (typeof evt.data.showRef === 'boolean') {
           var refEl = document.getElementById('presentRef');
           if (refEl) refEl.style.display = evt.data.showRef ? '' : 'none';
+        }
+        if (typeof evt.data.refSize === 'number') {
+          var presentRefEl = document.getElementById('presentRef');
+          if (presentRefEl) presentRefEl.style.fontSize = 'calc(clamp(0.9rem, 1.8vw, 1.6rem) * ' + evt.data.refSize + ' / 100)';
         }
       }
       if (evt.data.type === 'bibleMaxFontUpdate' && typeof evt.data.maxFont === 'number') {
@@ -1500,8 +1508,8 @@ document.addEventListener('keydown', function(evt) {
 window.addEventListener('load', function() {
       applyThemeFromStorage();
       applyPresenterSettings({
-        bgImage: localStorage.getItem('settings_bibleBgImage') || localStorage.getItem('settings_presenterBgImage') || '',
-        bgOpacity: Number(localStorage.getItem('settings_bibleBgOpacity') || localStorage.getItem('settings_presenterBgOpacity')) || 30,
+        bgImage: localStorage.getItem('settings_bibleBgImage') || '',
+        bgOpacity: Number(localStorage.getItem('settings_bibleBgOpacity')) || 30,
       });
 maximizeWindow();
       schedulePresenterFit();
@@ -1522,6 +1530,10 @@ maximizeWindow();
       var showRef = localStorage.getItem('settings_bibleShowRef');
       var refEl = document.getElementById('presentRef');
       if (refEl && showRef === 'false') refEl.style.display = 'none';
+      var refSize = Number(localStorage.getItem('settings_bibleRefSize')) || 100;
+      if (refEl && refSize !== 100) {
+        refEl.style.fontSize = 'calc(clamp(0.9rem, 1.8vw, 1.6rem) * ' + refSize + ' / 100)';
+      }
     })();
 updateVerse(${safeJsonStringify({
       reference: initialRef,

@@ -39,6 +39,8 @@
   --success: #3d8060;
   --accent-success: #3d8060;
   --accent-success-soft: rgba(61, 128, 96, 0.3);
+  --accent-error: var(--danger);
+  --accent-link: var(--link);
   --link: #4169E1;
   --highlight: #4169E1;
   --highlight-soft: rgba(65, 105, 225, 0.15);
@@ -48,6 +50,7 @@
   --shadow-md: 0 4px 12px rgba(0, 0, 0, 0.3);
   --shadow-lg: 0 12px 40px rgba(0, 0, 0, 0.4);
   --shadow-xl: 0 20px 60px rgba(0, 0, 0, 0.5);
+  --shadow: var(--shadow-md);
 
   /* ── Overlay ── */
   --overlay: rgba(0, 0, 0, 0.6);

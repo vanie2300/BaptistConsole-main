@@ -4,6 +4,9 @@
 <meta charset="UTF-8">
 <title>Presentation</title>
 <meta name="viewport" content="width=1024, initial-scale=1.0">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
 <link rel="stylesheet" href="../theme.css">
 <script>
   (() => {
@@ -201,8 +204,8 @@ function applyPresenterSettings() {
     const text = localStorage.getItem('settings_presenterText');
     const weight = localStorage.getItem('settings_presenterWeight');
     const font = localStorage.getItem('settings_presenterFont');
-    const bgImage = localStorage.getItem('settings_hymnBgImage') || localStorage.getItem('settings_presenterBgImage');
-    const bgOpacity = localStorage.getItem('settings_hymnBgOpacity') || localStorage.getItem('settings_presenterBgOpacity');
+    const bgImage = localStorage.getItem('settings_hymnBgImage');
+    const bgOpacity = localStorage.getItem('settings_hymnBgOpacity');
 
     if (bg) root.style.setProperty('--present-bg', bg);
     if (text) root.style.setProperty('--present-text', text);
