@@ -1,0 +1,128 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>User Guide — Baptist Console</title>
+  <meta name="description" content="How to use Baptist Console: Bible and Hymn presenters, searching, and projecting.">
+  <link rel="stylesheet" href="style.css">
+  <script>
+    (function(){try{var t=null;try{t=localStorage.getItem('docs-theme')}catch(e){}if(!t){var n=window.name;if(n&&n.indexOf('bc-theme:')===0){t=n.slice(9)}}if(!t){var m=location.search.match(/[?&]theme=(dark|light)/);if(m){t=m[1]}}var p=window.matchMedia&&window.matchMedia('(prefers-color-scheme: dark)').matches;if(t==='dark'||(!t&&p)){document.documentElement.classList.add('theme-dark')}}catch(e){}})();
+  </script>
+</head>
+<body>
+  <header class="site-header">
+    <span class="brand">Baptist <span class="tag">Console</span></span>
+    <nav class="site-nav">
+      <a href="index.html">Home</a>
+      <a href="guide.html" class="active">User Guide</a>
+      <a href="settings.html">Settings</a>
+      <a href="shortcuts.html">Shortcuts</a>
+      <a href="faq.html">FAQ</a>
+      <a href="release.html">Release Notes</a>
+      <a href="architecture.html">Architecture</a>
+      <a href="developer.html">Developer</a>
+      <a href="support.html">Support</a>
+    </nav>
+    <button class="theme-toggle" id="themeToggle" type="button" aria-label="Toggle dark mode" title="Toggle dark mode" aria-pressed="false">
+      <svg class="icon-moon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M21 12.8A9 9 0 1 1 11.2 3a7 7 0 0 0 9.8 9.8Z"/></svg>
+      <svg class="icon-sun" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="4"/><path d="M12 2v2m0 16v2M4.9 4.9l1.4 1.4m11.4 11.4 1.4 1.4M2 12h2m16 0h2M4.9 19.1l1.4-1.4M17.7 6.3l1.4-1.4"/></svg>
+    </button>
+  </header>
+
+  <main>
+    <p class="breadcrumb"><a href="index.html">Home</a> / User Guide</p>
+    <h1>User Guide</h1>
+    <p class="lead">Everyday operation of the console: picking verses, presenting hymns, and running the projection window.</p>
+
+    <h2>Console tabs</h2>
+    <table>
+      <tr><th>Key</th><th>Action</th></tr>
+      <tr><td><code>1</code></td><td>Switch to the Bible tab</td></tr>
+      <tr><td><code>2</code></td><td>Switch to the Hymns tab</td></tr>
+    </table>
+
+    <h2>Bible Presenter</h2>
+    <table>
+      <tr><th>Action</th><th>How</th></tr>
+      <tr>
+        <td>Pick a verse</td>
+        <td>Select <strong>Book → Chapter → Verse</strong> in the left panel.</td>
+      </tr>
+      <tr>
+        <td>Reference search</td>
+        <td>Type e.g. <code>John 3:16</code> into the search bar and press <span class="kbd">Enter</span>.</td>
+      </tr>
+      <tr>
+        <td>Keyword search</td>
+        <td>Open the search dropdown, choose <strong>Keyword</strong>, pick a scope (<strong>Whole Bible</strong> / <strong>Current Book</strong>), enter the term, click <strong>Go</strong>.</td>
+      </tr>
+      <tr>
+        <td>Clear search</td>
+        <td><strong>Clear Search</strong> in the dropdown, or press <span class="kbd">Esc</span>.</td>
+      </tr>
+      <tr>
+        <td>Project a verse</td>
+        <td>Click <strong>Display Verse</strong> to open the projector on the configured display.</td>
+      </tr>
+      <tr>
+        <td>Toggle reference on screen</td>
+        <td>Settings → Bible Presenter → <strong>Show Verse Reference</strong>.</td>
+      </tr>
+    </table>
+
+    <p>Search results highlight matching terms, and the matched book/chapter/verse is selected and auto-scrolled in the list.</p>
+
+    <h2>Hymn Presenter</h2>
+    <table>
+      <tr><th>Action</th><th>How</th></tr>
+      <tr>
+        <td>Find a hymn</td>
+        <td>Type in the search box — matching titles are filtered and the search term is highlighted.</td>
+      </tr>
+      <tr>
+        <td>Select a hymn</td>
+        <td>Click a row — slides render in the center preview with upcoming thumbnails on the right.</td>
+      </tr>
+      <tr>
+        <td>Navigate slides</td>
+        <td><span class="kbd">←</span> / <span class="kbd">→</span> arrow keys (when not typing) or the on-screen buttons.</td>
+      </tr>
+      <tr>
+        <td>Present</td>
+        <td>Click <strong>Present</strong> to open the projection window on the chosen display.</td>
+      </tr>
+      <tr>
+        <td>Add a hymn</td>
+        <td><strong>+ Add Hymn</strong> → fill title, verses, optional chorus → <strong>Save Hymn</strong> (persists to <code>hymns.json</code>).</td>
+      </tr>
+      <tr>
+        <td>Delete a hymn</td>
+        <td>Select it and click <strong>Delete Hymn</strong>.</td>
+      </tr>
+    </table>
+
+    <h2>Presenter window</h2>
+    <ul>
+      <li>Opens <strong>focused</strong>, filling the full bounds of the selected display.</li>
+      <li>Windows are <strong>normal</strong> — use native <strong>Alt+Tab</strong> to switch between the projection, PowerPoint, and the console.</li>
+      <li><span class="kbd">Esc</span> (while the console or a presenter has focus) closes presentation windows.</li>
+      <li>Minimizing or hiding a presenter window closes it (by design).</li>
+    </ul>
+
+    <div class="alert">
+      <strong>Tip:</strong> the presenter status light in the console turns green and pulses "Live" whenever a projection window is open.
+    </div>
+
+    <h2>Data files</h2>
+    <table>
+      <tr><th>File</th><th>Purpose</th></tr>
+      <tr><td><code>bible/kjv1611.json</code></td><td>Read-only verse data (KJV 1611).</td></tr>
+      <tr><td><code>hymns/hymns.json</code></td><td>Hymn library, edited via the app and written back by the main process. Diff-friendly (2-space indent).</td></tr>
+    </table>
+  </main>
+
+  <footer class="site-footer">Baptist Console — Church Presentation Suite · MIT © Jovanie Cangke</footer>
+  <script src="docs.js?v=2"></script>
+</body>
+</html>

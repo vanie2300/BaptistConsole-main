@@ -1,0 +1,192 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Developer Guide — Baptist Console</title>
+  <meta name="description" content="Deep technical reference for Baptist Console: IPC channels, postMessage protocol, localStorage keys, and window lifecycle.">
+  <link rel="stylesheet" href="style.css">
+  <script>
+    (function(){try{var t=null;try{t=localStorage.getItem('docs-theme')}catch(e){}if(!t){var n=window.name;if(n&&n.indexOf('bc-theme:')===0){t=n.slice(9)}}if(!t){var m=location.search.match(/[?&]theme=(dark|light)/);if(m){t=m[1]}}var p=window.matchMedia&&window.matchMedia('(prefers-color-scheme: dark)').matches;if(t==='dark'||(!t&&p)){document.documentElement.classList.add('theme-dark')}}catch(e){}})();
+  </script>
+</head>
+<body>
+  <header class="site-header">
+    <span class="brand">Baptist <span class="tag">Console</span></span>
+    <nav class="site-nav">
+      <a href="index.html">Home</a>
+      <a href="guide.html">User Guide</a>
+      <a href="settings.html">Settings</a>
+      <a href="shortcuts.html">Shortcuts</a>
+      <a href="faq.html">FAQ</a>
+      <a href="release.html">Release Notes</a>
+      <a href="architecture.html">Architecture</a>
+      <a href="developer.html" class="active">Developer</a>
+      <a href="support.html">Support</a>
+    </nav>
+    <button class="theme-toggle" id="themeToggle" type="button" aria-label="Toggle dark mode" title="Toggle dark mode" aria-pressed="false">
+      <svg class="icon-moon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M21 12.8A9 9 0 1 1 11.2 3a7 7 0 0 0 9.8 9.8Z"/></svg>
+      <svg class="icon-sun" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="4"/><path d="M12 2v2m0 16v2M4.9 4.9l1.4 1.4m11.4 11.4 1.4 1.4M2 12h2m16 0h2M4.9 19.1l1.4-1.4M17.7 6.3l1.4-1.4"/></svg>
+    </button>
+  </header>
+
+  <main>
+    <p class="breadcrumb"><a href="index.html">Home</a> / Developer Guide</p>
+    <h1>Developer Guide</h1>
+    <p class="lead">IPC channels, the inter-frame <code>postMessage</code> protocol, localStorage keys, and the presenter-window lifecycle.</p>
+
+    <details class="toc" open>
+      <summary>On this page</summary>
+      <ul>
+        <li><a href="#ipc">IPC channels</a></li>
+        <li><a href="#preload">The preload bridge</a></li>
+        <li><a href="#proxy">The iframe presenter proxy</a></li>
+        <li><a href="#messages">Inter-frame messages</a></li>
+        <li><a href="#storage">localStorage keys</a></li>
+        <li><a href="#lifecycle">Presenter window lifecycle</a></li>
+      </ul>
+    </details>
+
+    <h2 id="ipc">IPC channels</h2>
+    <p>All IPC is declared in <code>main.js</code> and surfaced through <code>preload.js</code>. The renderer never touches the filesystem directly.</p>
+
+    <h3>Invoke / handle (request–response)</h3>
+    <table>
+      <tr><th>Channel</th><th>Direction</th><th>Returns / Behavior</th></tr>
+      <tr>
+        <td><code>get-displays</code></td>
+        <td>renderer → main</td>
+        <td>Array of <code>{ id, isPrimary, size, bounds }</code> for every connected display.</td>
+      </tr>
+      <tr>
+        <td><code>get-hymns</code></td>
+        <td>renderer → main</td>
+        <td><code>{ ok: true, data }</code> with the parsed <code>hymns.json</code>, or <code>{ ok: false, error }</code>.</td>
+      </tr>
+      <tr>
+        <td><code>save-hymns</code></td>
+        <td>renderer → main</td>
+        <td>Writes the array to <code>hymns/hymns.json</code> (2-space indent). Rejects non-arrays.</td>
+      </tr>
+      <tr>
+        <td><code>pick-background-image</code></td>
+        <td>renderer → main</td>
+        <td>Opens a native file dialog (jpg/jpeg/png/gif/webp/bmp). Returns the chosen path or <code>null</code>.</td>
+      </tr>
+    </table>
+
+    <h3>Send (fire–and-forget)</h3>
+    <table>
+      <tr><th>Channel</th><th>Purpose</th></tr>
+      <tr><td><code>window-minimize</code></td><td>Minimize the main console window.</td></tr>
+      <tr><td><code>window-maximize</code></td><td>Toggle maximize/restore on the main window.</td></tr>
+      <tr><td><code>window-close</code></td><td>Close the main window.</td></tr>
+      <tr><td><code>set-presenter-display</code></td><td>Record which display (by id) presenters should open on.</td></tr>
+      <tr><td><code>presenter-close-window</code></td><td>Destroy the presenter window that sent it (Esc path).</td></tr>
+    </table>
+
+    <h2 id="preload">The preload bridge</h2>
+    <p><code>preload.js</code> runs with <code>contextIsolation: true</code> and <code>nodeIntegration: false</code>. It exposes two globals:</p>
+    <ul>
+      <li><code>window.windowControls</code> — <code>minimize()</code>, <code>maximize()</code>, <code>close()</code> for the custom title bar.</li>
+      <li><code>window.presenterApi</code> — <code>getDisplays()</code>, <code>setPresenterDisplay(id)</code>, <code>getHymns()</code>, <code>saveHymns(hymns)</code>, <code>pickBackgroundImage()</code>, <code>closeWindow()</code>.</li>
+    </ul>
+
+    <h2 id="proxy">The iframe presenter proxy</h2>
+    <p>The Bible and Hymn tabs are <code>&lt;iframe&gt;</code>s, so they cannot see <code>window.presenterApi</code> directly. <code>presenter-proxy.js</code> (injected into each iframe) bridges the gap:</p>
+    <ol>
+      <li>The iframe calls <code>presenterApi</code> from the proxy.</li>
+      <li>The proxy posts <code>{ type: 'presenterApiRequest', requestId, method, args }</code> to <code>parent</code>.</li>
+      <li><code>shell.js</code> resolves the method and replies <code>{ type: 'presenterApiResponse', requestId, result, error }</code>.</li>
+      <li>Pending calls time out after 5&nbsp;seconds.</li>
+    </ol>
+    <p>The proxy exposes <code>getDisplays</code>, <code>setPresenterDisplay</code>, <code>getHymns</code>, and <code>saveHymns</code> — file-picker and window-close remain main-frame only.</p>
+
+    <h2 id="messages">Inter-frame messages</h2>
+    <p>All cross-window communication uses <code>postMessage</code> with a string <code>type</code>. The console → iframe → presenter-window chain keeps modules isolated.</p>
+
+    <h3>Console → iframes</h3>
+    <table>
+      <tr><th>Message</th><th>Payload</th><th>Handler</th></tr>
+      <tr>
+        <td><code>settingsUpdate</code></td>
+        <td>shared presenter colors/font + per-module background image + opacity</td>
+        <td><code>shell.js:244-245</code> → bible.js / presenter.js</td>
+      </tr>
+      <tr>
+        <td><code>bibleMaxFontUpdate</code></td>
+        <td><code>maxFont</code> (px ceiling)</td>
+        <td><code>bible.js:196</code></td>
+      </tr>
+      <tr>
+        <td><code>bibleSettingsUpdate</code></td>
+        <td><code>showRef</code> (bool), <code>refSize</code> (percent)</td>
+        <td><code>bible.js:199</code></td>
+      </tr>
+      <tr>
+        <td><code>hymnSettingsUpdate</code></td>
+        <td><code>align</code>, <code>layout</code>, <code>showNumbers</code>, <code>titleSize</code>, <code>transition</code></td>
+        <td><code>presenter.js:365</code></td>
+      </tr>
+      <tr>
+        <td><code>presenterApiRequest</code></td>
+        <td><code>requestId</code>, <code>method</code>, <code>args</code></td>
+        <td><code>shell.js:973</code> (proxy resolver)</td>
+      </tr>
+    </table>
+
+    <h3>Iframe → presenter window</h3>
+    <table>
+      <tr><th>Message</th><th>Purpose</th></tr>
+      <tr><td><code>settingsUpdate</code></td><td>Push shared presenter colors/fonts + background to a live projection (<code>bible.js:1324</code>, <code>presenter.js:368</code>).</td></tr>
+      <tr><td><code>bibleSettingsUpdate</code></td><td>Toggle reference visibility and scale reference size live (<code>bible.js:1327</code>).</td></tr>
+      <tr><td><code>bibleMaxFontUpdate</code></td><td>Update the projection's max font ceiling live (<code>bible.js:1337</code>).</td></tr>
+      <tr><td><code>navigate</code></td><td>Hymns: move to a slide (<code>currentIndex</code>) from the console.</td></tr>
+      <tr><td><code>navigateFromPopup</code></td><td>Hymns: presenter window requests the console to change slides (<code>presenter.js:357</code>).</td></tr>
+    </table>
+
+    <h2 id="storage">localStorage keys</h2>
+    <p>Settings live in <code>localStorage</code> on the console frame; defaults are defined in <code>shell.js</code> (<code>KEYS</code>/<code>DEFAULTS</code>).</p>
+    <table>
+      <tr><th>Key</th><th>Default</th><th>Purpose</th></tr>
+      <tr><td><code>globalTheme</code></td><td><code>dark</code></td><td>App theme.</td></tr>
+      <tr><td><code>settings_presenterBg</code></td><td><code>#000000</code></td><td>Projected background color.</td></tr>
+      <tr><td><code>settings_presenterText</code></td><td><code>#ffffff</code></td><td>Projected text color.</td></tr>
+      <tr><td><code>settings_presenterWeight</code></td><td><code>600</code></td><td>Projected font weight.</td></tr>
+      <tr><td><code>settings_presenterFont</code></td><td>system sans-serif</td><td>Projected font family.</td></tr>
+      <tr><td><code>settings_bibleBgImage</code> / <code>settings_bibleBgOpacity</code></td><td><code>''</code> / <code>30</code></td><td>Bible projector background.</td></tr>
+      <tr><td><code>settings_hymnBgImage</code> / <code>settings_hymnBgOpacity</code></td><td><code>''</code> / <code>30</code></td><td>Hymn projector background.</td></tr>
+      <tr><td><code>biblePresenterFontMax</code></td><td><code>800</code></td><td>Bible verse auto-fit ceiling (px).</td></tr>
+      <tr><td><code>settings_bibleShowRef</code></td><td><code>true</code></td><td>Show the projected verse reference.</td></tr>
+      <tr><td><code>settings_bibleRefSize</code></td><td><code>100</code></td><td>Reference size scale (50–200%).</td></tr>
+      <tr><td><code>settings_hymnAlign</code></td><td><code>left</code></td><td>Hymn text alignment.</td></tr>
+      <tr><td><code>settings_hymnLayout</code></td><td><code>full</code></td><td>Full or compact layout.</td></tr>
+      <tr><td><code>settings_hymnShowNumbers</code></td><td><code>true</code></td><td>Show "Verse N" labels.</td></tr>
+      <tr><td><code>settings_hymnTitleSize</code></td><td><code>7</code></td><td>Default title size (vw).</td></tr>
+      <tr><td><code>settings_hymnTransition</code></td><td><code>none</code></td><td>Slide transition type.</td></tr>
+    </table>
+
+    <div class="alert alert-info">
+      <strong>Legacy:</strong> the old shared key <code>settings_presenterBgImage</code> no longer exists. On first run it is migrated to the active module's key and removed so backgrounds never leak between modules.
+    </div>
+
+    <h2 id="lifecycle">Presenter window lifecycle</h2>
+    <p><code>main.js</code> never opens presenters directly — they are popups produced by the module iframes. The flow:</p>
+    <ol>
+      <li>A module calls <code>window.open</code> (or the equivalent); <code>setWindowOpenHandler</code> permits only <code>presentation.html</code> and <code>about:blank</code> popups.</li>
+      <li><code>did-create-window</code> attaches the guard and places the window via <code>setBounds</code> on the configured display after load.</li>
+      <li>Guards enforce behavior:
+        <ul>
+          <li><span class="kbd">Esc</span> inside a presenter destroys it.</li>
+          <li>Minimizing/hiding destroys it (watchdog checks every 500&nbsp;ms).</li>
+          <li><span class="kbd">Esc</span> with the main window focused destroys <em>all</em> presenters.</li>
+        </ul>
+      </li>
+      <li>Presenters are <strong>normal</strong> windows (never always-on-top) so users can Alt+Tab freely.</li>
+    </ol>
+  </main>
+
+  <footer class="site-footer">Baptist Console — Church Presentation Suite · MIT © Jovanie Cangke</footer>
+  <script src="docs.js?v=2"></script>
+</body>
+</html>
