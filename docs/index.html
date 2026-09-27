@@ -3,8 +3,8 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Baptist Console — Documentation</title>
-  <meta name="description" content="Baptist Console: church presentation suite for Bible verses and hymns. Official documentation.">
+  <title>Baptist Console — Church Presentation Suite</title>
+  <meta name="description" content="Download Baptist Console, the free open-source church presentation suite for projecting Bible verses and hymns. Windows installer and full documentation.">
   <link rel="stylesheet" href="style.css">
   <script>
     (function(){try{var t=null;try{t=localStorage.getItem('docs-theme')}catch(e){}if(!t){var n=window.name;if(n&&n.indexOf('bc-theme:')===0){t=n.slice(9)}}if(!t){var m=location.search.match(/[?&]theme=(dark|light)/);if(m){t=m[1]}}var p=window.matchMedia&&window.matchMedia('(prefers-color-scheme: dark)').matches;if(t==='dark'||(!t&&p)){document.documentElement.classList.add('theme-dark')}}catch(e){}})();
@@ -43,14 +43,17 @@
       </p>
 
       <div class="hero-actions">
-        <a class="btn btn-primary" href="guide.html">Read the user guide</a>
-        <a class="btn btn-ghost" href="release.html">Release notes</a>
+        <a class="btn btn-primary download-btn" id="downloadBtn" href="https://github.com/vanie2300/BaptistConsole-main/releases/latest" download>Download for Windows</a>
+        <a class="btn btn-ghost" href="https://github.com/vanie2300/BaptistConsole-main/releases/latest" target="_blank" rel="noopener">View on GitHub</a>
+        <a class="btn btn-ghost" href="guide.html">User guide</a>
       </div>
+      <p class="dl-meta">v<span id="dlVersion">1.0.0</span> &middot; <span id="dlSize">~80 MB</span> &middot; Windows 10/11 &middot; Free &amp; open source (MIT)</p>
     </div>
 
     <div class="card" style="margin-top: 20px;">
       <h3 style="margin-top: 0;">Getting started</h3>
-      <p>Make sure <a href="https://nodejs.org">Node.js</a> (LTS recommended) is installed, then:</p>
+      <p><strong>End users:</strong> click <em>Download for Windows</em> above, run the installer, and you're ready to go. The app checks GitHub for updates automatically, so you only need to download once — new versions arrive via the in-app update prompt.</p>
+      <p><strong>Developers:</strong> build from source with <a href="https://nodejs.org">Node.js</a> (LTS recommended):</p>
       <pre><code>npm install
 npm start</code></pre>
       <p>Build installers:</p>
@@ -115,6 +118,26 @@ npm run build:linux   # Linux AppImage → dist/</code></pre>
   </main>
 
   <footer class="site-footer">Baptist Console — Church Presentation Suite · MIT © Jovanie Cangke</footer>
+  <script>
+    (function () {
+      'use strict';
+      var btn = document.getElementById('downloadBtn');
+      if (!btn) return;
+      var verEl = document.getElementById('dlVersion');
+      var sizeEl = document.getElementById('dlSize');
+      fetch('https://api.github.com/repos/vanie2300/BaptistConsole-main/releases/latest')
+        .then(function (r) { if (!r.ok) throw new Error('bad status'); return r.json(); })
+        .then(function (rel) {
+          var asset = (rel.assets || []).filter(function (a) {
+            return /\.exe$/i.test(a.name) && /Setup/i.test(a.name);
+          })[0] || (rel.assets || []).filter(function (a) { return /\.exe$/i.test(a.name); })[0];
+          if (asset) btn.href = asset.browser_download_url;
+          if (rel.tag_name && verEl) verEl.textContent = rel.tag_name.replace(/^v/i, '');
+          if (asset && asset.size && sizeEl) sizeEl.textContent = Math.max(1, Math.round(asset.size / 1048576)) + ' MB';
+        })
+        .catch(function () { /* keep the fallback link to the latest release page */ });
+    })();
+  </script>
   <script src="docs.js?v=2"></script>
 </body>
 </html>
