@@ -3,16 +3,22 @@
 
   let _id = 0;
   const pending = new Map();
+  const displayListeners = new Set();
 
   window.addEventListener('message', (e) => {
     const data = e.data;
     if (!data || typeof data !== 'object') return;
-    if (data.type !== 'presenterApiResponse') return;
     if (e.source !== window.parent) return;
-    const cb = pending.get(data.requestId);
-    if (!cb) return;
-    pending.delete(data.requestId);
-    cb(data);
+    if (data.type === 'presenterApiResponse') {
+      const cb = pending.get(data.requestId);
+      if (!cb) return;
+      pending.delete(data.requestId);
+      cb(data);
+    } else if (data.type === 'displaysChanged') {
+      displayListeners.forEach((cb) => {
+        try { cb(); } catch (err) {}
+      });
+    }
   });
 
   function call(method, ...args) {
@@ -37,5 +43,10 @@
     setPresenterDisplay: (id) => call('set-presenter-display', id),
     getHymns: () => call('get-hymns'),
     saveHymns: (hymns) => call('save-hymns', hymns),
+    onDisplaysChanged: (cb) => {
+      if (typeof cb !== 'function') return () => {};
+      displayListeners.add(cb);
+      return () => displayListeners.delete(cb);
+    },
   };
 })();

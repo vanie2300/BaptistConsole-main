@@ -60,6 +60,8 @@
       if (e.key === '1') switchTab('bible');
       if (e.key === '2') switchTab('hymns');
       if (e.key === 'Escape') {
+        const wm = document.getElementById('welcomeModal');
+        if (wm && !wm.hidden) { wm.hidden = true; return; }
         const modal = document.getElementById('settingsModal');
         if (modal && !modal.hidden) modal.hidden = true;
       }
@@ -87,12 +89,18 @@
     bibleFontMax: 'biblePresenterFontMax',
     bibleShowRef: 'settings_bibleShowRef',
     bibleRefSize: 'settings_bibleRefSize',
+    bibleShowTitles: 'settings_bibleShowTitles',
+    biblePresentSize: 'settings_biblePresentSize',
     hymnAlign: 'settings_hymnAlign',
     hymnLayout: 'settings_hymnLayout',
     hymnShowNumbers: 'settings_hymnShowNumbers',
     hymnTitleSize: 'settings_hymnTitleSize',
+    hymnFontSize: 'settings_hymnFontSize',
     hymnTransition: 'settings_hymnTransition',
   };
+
+  const WELCOME_KEY = 'settings_welcomeNeverShow';
+  const APP_VERSION = 'v1.0.0';
 
   const DEFAULTS = {
     theme: 'dark',
@@ -109,10 +117,13 @@
     bibleFontMax: 800,
     bibleShowRef: 'true',
     bibleRefSize: '100',
+    bibleShowTitles: 'true',
+    biblePresentSize: '130',
     hymnAlign: 'left',
     hymnLayout: 'full',
     hymnShowNumbers: 'true',
     hymnTitleSize: '7',
+    hymnFontSize: '7',
     hymnTransition: 'none',
   };
 
@@ -263,9 +274,11 @@
   function pushBibleSettings() {
     const showRef = loadSetting(KEYS.bibleShowRef, DEFAULTS.bibleShowRef) === 'true';
     const refSize = Number(loadSetting(KEYS.bibleRefSize, DEFAULTS.bibleRefSize)) || 100;
+    const showTitles = loadSetting(KEYS.bibleShowTitles, DEFAULTS.bibleShowTitles) === 'true';
+    const presentSize = Number(loadSetting(KEYS.biblePresentSize, DEFAULTS.biblePresentSize)) || 130;
     [bibleFrame, hymnFrame].forEach((frame) => {
       try {
-        frame.contentWindow?.postMessage({ type: 'bibleSettingsUpdate', showRef, refSize }, '*');
+        frame.contentWindow?.postMessage({ type: 'bibleSettingsUpdate', showRef, refSize, showTitles, presentSize }, '*');
       } catch (e) {}
     });
   }
@@ -277,6 +290,7 @@
       layout: loadSetting(KEYS.hymnLayout, DEFAULTS.hymnLayout),
       showNumbers: loadSetting(KEYS.hymnShowNumbers, DEFAULTS.hymnShowNumbers) === 'true',
       titleSize: Number(loadSetting(KEYS.hymnTitleSize, DEFAULTS.hymnTitleSize)),
+      fontSize: Number(loadSetting(KEYS.hymnFontSize, DEFAULTS.hymnFontSize)),
       transition: loadSetting(KEYS.hymnTransition, DEFAULTS.hymnTransition),
     };
     [bibleFrame, hymnFrame].forEach((frame) => {
@@ -606,6 +620,23 @@
     });
   }
 
+  // ── Bible Show Psalm Titles ──
+  const bibleShowTitles = document.getElementById('bibleShowTitles');
+
+  function syncBibleShowTitlesUI() {
+    const current = loadSetting(KEYS.bibleShowTitles, DEFAULTS.bibleShowTitles) === 'true';
+    if (bibleShowTitles) bibleShowTitles.checked = current;
+  }
+
+  if (bibleShowTitles) {
+    syncBibleShowTitlesUI();
+    bibleShowTitles.addEventListener('change', () => {
+      saveSetting(KEYS.bibleShowTitles, String(bibleShowTitles.checked));
+      syncPreview();
+      pushBibleSettings();
+    });
+  }
+
   // ── Bible Reference Size ──
   const bibleRefSizeInput = document.getElementById('bibleRefSize');
   const bibleRefSizeRange = document.getElementById('bibleRefSizeRange');
@@ -636,6 +667,39 @@
     });
     bibleRefSizeRange.addEventListener('change', () => {
       applyBibleRefSize(Number(bibleRefSizeRange.value));
+    });
+  }
+
+  // ── Bible Projected Text Size ──
+  const biblePresentSizeInput = document.getElementById('biblePresentSize');
+  const biblePresentSizeRange = document.getElementById('biblePresentSizeRange');
+
+  function syncBiblePresentSizeUI() {
+    const val = Number(loadSetting(KEYS.biblePresentSize, DEFAULTS.biblePresentSize)) || 130;
+    if (biblePresentSizeInput) biblePresentSizeInput.value = val;
+    if (biblePresentSizeRange) biblePresentSizeRange.value = val;
+  }
+
+  function applyBiblePresentSize(val) {
+    const clamped = Math.min(155, Math.max(70, Number(val) || 130));
+    saveSetting(KEYS.biblePresentSize, clamped);
+    syncBiblePresentSizeUI();
+    pushBibleSettings();
+  }
+
+  if (biblePresentSizeInput) {
+    syncBiblePresentSizeUI();
+    biblePresentSizeInput.addEventListener('change', () => {
+      applyBiblePresentSize(Number(biblePresentSizeInput.value));
+    });
+  }
+
+  if (biblePresentSizeRange) {
+    biblePresentSizeRange.addEventListener('input', () => {
+      if (biblePresentSizeInput) biblePresentSizeInput.value = biblePresentSizeRange.value;
+    });
+    biblePresentSizeRange.addEventListener('change', () => {
+      applyBiblePresentSize(Number(biblePresentSizeRange.value));
     });
   }
 
@@ -713,6 +777,30 @@
     });
     hymnTitleSize.addEventListener('change', () => {
       saveSetting(KEYS.hymnTitleSize, hymnTitleSize.value);
+      syncPreview();
+      pushHymnSettings();
+    });
+  }
+
+  // ── Hymn Slide Font Size ──
+  const hymnFontSize = document.getElementById('hymnFontSize');
+  const hymnFontSizeValue = document.getElementById('hymnFontSizeValue');
+
+  function syncHymnFontSizeUI() {
+    const current = loadSetting(KEYS.hymnFontSize, DEFAULTS.hymnFontSize);
+    if (hymnFontSize) hymnFontSize.value = current;
+    if (hymnFontSizeValue) hymnFontSizeValue.textContent = current + 'vw';
+  }
+
+  if (hymnFontSize) {
+    syncHymnFontSizeUI();
+    hymnFontSize.addEventListener('input', () => {
+      if (hymnFontSizeValue) hymnFontSizeValue.textContent = hymnFontSize.value + 'vw';
+    });
+    hymnFontSize.addEventListener('change', () => {
+      saveSetting(KEYS.hymnFontSize, hymnFontSize.value);
+      syncPreview();
+      pushHymnSettings();
     });
   }
 
@@ -759,10 +847,12 @@
     syncBibleMaxFontUI(loadSetting(KEYS.bibleFontMax, DEFAULTS.bibleFontMax));
     syncBibleShowRefUI();
     syncBibleRefSizeUI();
+    syncBibleShowTitlesUI();
     syncHymnAlignUI();
     syncHymnLayoutUI();
     syncHymnShowNumbersUI();
     syncHymnTitleSizeUI();
+    syncHymnFontSizeUI();
     syncHymnTransitionUI();
     syncPreview();
   }
@@ -770,6 +860,7 @@
   // ── Live Preview ──
   const previewVerse = document.getElementById('previewVerse');
   const previewRef = document.getElementById('previewRef');
+  const previewTitle = document.getElementById('previewTitle');
   const previewLabel = document.getElementById('previewLabel');
   const previewBgDot = document.getElementById('previewBgDot');
   const previewBgLabel = document.getElementById('previewBgLabel');
@@ -834,6 +925,7 @@
       // Hymn preview
       const align = loadSetting(KEYS.hymnAlign, DEFAULTS.hymnAlign);
       const titleSize = Number(loadSetting(KEYS.hymnTitleSize, DEFAULTS.hymnTitleSize)) || 7;
+      const slideFontSize = Number(loadSetting(KEYS.hymnFontSize, DEFAULTS.hymnFontSize)) || 7;
       if (previewHymnNum) {
         previewHymnNum.style.fontFamily = font;
         previewHymnNum.style.fontWeight = weight;
@@ -850,7 +942,8 @@
         previewHymnVerse.style.fontWeight = weight;
         previewHymnVerse.style.textAlign = align;
         const len = (previewHymnVerse.textContent || '').length;
-        previewHymnVerse.style.fontSize = (len < 80 ? 3.4 : 2.5) + 'cqw';
+        const base = len < 80 ? 3.4 : 2.5;
+        previewHymnVerse.style.fontSize = (base * (slideFontSize / 7)).toFixed(2) + 'cqw';
       }
     } else {
       // Theme/Bible preview
@@ -868,6 +961,12 @@
         previewRef.style.fontFamily = font;
         previewRef.style.fontSize = `calc(0.85rem * ${refScale} / 100)`;
         previewRef.hidden = activePanel === 'bible' && !showRef;
+      }
+      if (previewTitle) {
+        previewTitle.style.fontFamily = font;
+        previewTitle.style.fontWeight = weight;
+        const showTitles = loadSetting(KEYS.bibleShowTitles, DEFAULTS.bibleShowTitles) === 'true';
+        previewTitle.hidden = activePanel === 'bible' && !showTitles;
       }
 
       // Chips (only show on Theme panel)
@@ -949,6 +1048,221 @@
     });
   }
 
+  // ── Welcome Screen ──
+  const welcomeModal = document.getElementById('welcomeModal');
+  const welcomeBackdrop = document.getElementById('welcomeBackdrop');
+  const welcomeClose = document.getElementById('welcomeClose');
+  const welcomeNever = document.getElementById('welcomeNever');
+  const welcomeGetStarted = document.getElementById('welcomeGetStarted');
+
+  function welcomeNeverShow() {
+    try { return localStorage.getItem(WELCOME_KEY) === '1'; } catch { return false; }
+  }
+
+  function setWelcomeNeverShow(value) {
+    try { localStorage.setItem(WELCOME_KEY, value ? '1' : ''); } catch { /* ignore */ }
+  }
+
+  function openWelcome() {
+    if (!welcomeModal) return;
+    if (welcomeNever) welcomeNever.checked = welcomeNeverShow();
+    welcomeModal.hidden = false;
+  }
+
+  function closeWelcome() {
+    if (welcomeModal) welcomeModal.hidden = true;
+  }
+
+  if (welcomeGetStarted) {
+    welcomeGetStarted.addEventListener('click', () => {
+      if (welcomeNever) setWelcomeNeverShow(welcomeNever.checked);
+      closeWelcome();
+    });
+  }
+
+  if (welcomeClose) {
+    welcomeClose.addEventListener('click', closeWelcome);
+  }
+
+  if (welcomeBackdrop) {
+    welcomeBackdrop.addEventListener('click', closeWelcome);
+  }
+
+  if (!welcomeNeverShow()) {
+    setTimeout(openWelcome, 300);
+  }
+
+  // ── About ──
+  const aboutVersionEls = [
+    document.getElementById('aboutVersion'),
+    document.getElementById('aboutVersionMeta'),
+  ];
+  aboutVersionEls.forEach((el) => {
+    if (el) el.textContent = APP_VERSION;
+  });
+
+  const statusVersion = document.querySelector('.status-version');
+  if (statusVersion) statusVersion.textContent = APP_VERSION;
+
+  const aboutShowWelcome = document.getElementById('aboutShowWelcome');
+  if (aboutShowWelcome) {
+    aboutShowWelcome.addEventListener('click', openWelcome);
+  }
+
+  // ── In-app Updates ──
+  const updateApi = window.updateApi;
+  const updateBanner = document.getElementById('updateBanner');
+  const updateBannerTitle = document.getElementById('updateBannerTitle');
+  const updateBannerText = document.getElementById('updateBannerText');
+  const updateBannerAction = document.getElementById('updateBannerAction');
+  const updateBannerLater = document.getElementById('updateBannerLater');
+  const settingsBtnDot = document.getElementById('settingsBtnDot');
+  const updateStateText = document.getElementById('updateStateText');
+  const updateStateDetail = document.getElementById('updateStateDetail');
+  const updateStateBadge = document.getElementById('updateStateBadge');
+  const checkForUpdates = document.getElementById('checkForUpdates');
+  const installUpdateBtn = document.getElementById('installUpdateBtn');
+
+  let updateReadyMode = null;
+
+  const isElectronUpdate =
+    Boolean(updateApi) && navigator.userAgent.toLowerCase().includes('electron');
+
+  function showUpdateBanner(mode, version) {
+    if (!updateBanner) return;
+    updateReadyMode = mode;
+    if (updateBannerAction) updateBannerAction.style.display = '';
+    if (updateBannerLater) updateBannerLater.style.display = '';
+    const vText = version ? ' v' + version : '';
+    updateBannerTitle.textContent = mode === 'ready' ? 'Update ready to install' : 'Update available';
+    updateBannerText.textContent =
+      mode === 'ready'
+        ? 'Baptist Console' + vText + ' has been downloaded. Restart now to finish updating?'
+        : 'A new version of Baptist Console (' + vText + ') is available. Update to the latest version?';
+    updateBannerAction.textContent = mode === 'ready' ? 'Restart Now' : 'Update Now';
+    updateBannerLater.textContent = mode === 'ready' ? 'Later' : 'Not now';
+    updateBanner.hidden = false;
+  }
+
+  function hideUpdateBanner() {
+    if (updateBanner) updateBanner.hidden = true;
+    updateReadyMode = null;
+  }
+
+  function applyUpdateStatus(state) {
+    if (!isElectronUpdate || !state) return;
+    if (state.error && updateReadyMode === 'downloading') {
+      hideUpdateBanner();
+    }
+    if (state.available || state.downloading || state.downloaded) {
+      if (settingsBtnDot) {
+        settingsBtnDot.hidden = false;
+        settingsBtnDot.textContent = '!';
+      }
+      if (updateStateBadge) updateStateBadge.hidden = false;
+      if (installUpdateBtn) installUpdateBtn.hidden = false;
+    } else {
+      if (settingsBtnDot) settingsBtnDot.hidden = true;
+      if (updateStateBadge) updateStateBadge.hidden = true;
+      if (installUpdateBtn) installUpdateBtn.hidden = true;
+    }
+
+    if (updateStateText) {
+      if (state.downloading) updateStateText.textContent = 'Downloading update…';
+      else if (state.checking) updateStateText.textContent = 'Checking for updates…';
+      else if (state.downloaded) updateStateText.textContent = 'Ready to install';
+      else if (state.available) updateStateText.textContent = 'A new version is available';
+      else if (state.error) updateStateText.textContent = 'Update check unavailable';
+      else updateStateText.textContent = 'You are up to date';
+    }
+
+    if (updateStateDetail) {
+      if (state.downloaded) {
+        updateStateDetail.textContent = 'v' + (state.version || '') + ' downloaded — restart to install';
+      } else if (state.available && state.version) {
+        updateStateDetail.textContent = 'Installed ' + APP_VERSION + ' → v' + state.version;
+      } else if (state.error) {
+        updateStateDetail.textContent = state.error;
+      } else if (!state.checking) {
+        updateStateDetail.textContent = 'Installed ' + APP_VERSION;
+      } else {
+        updateStateDetail.textContent = '';
+      }
+    }
+
+    if (state.notify && state.available && state.version) {
+      showUpdateBanner('notify', state.version);
+    }
+  }
+
+  if (updateBannerAction) {
+    updateBannerAction.addEventListener('click', async () => {
+      if (!isElectronUpdate) return;
+      if (updateReadyMode === 'ready') {
+        updateApi.restart();
+        return;
+      }
+      if (updateApi.defer) updateApi.defer();
+      updateReadyMode = 'downloading';
+      updateBannerTitle.textContent = 'Downloading update…';
+      updateBannerText.textContent = 'Getting the latest version ready — this may take a minute.';
+      updateBannerAction.style.display = 'none';
+      updateBannerLater.style.display = 'none';
+      const result = await updateApi.download();
+      if (result && result.ok === false) {
+        hideUpdateBanner();
+        showToast(result.error || 'Update failed to download', 'error');
+      }
+    });
+  }
+
+  if (updateBannerLater) {
+    updateBannerLater.addEventListener('click', () => {
+      hideUpdateBanner();
+      if (updateApi && updateApi.defer) updateApi.defer();
+    });
+  }
+
+  if (checkForUpdates) {
+    checkForUpdates.addEventListener('click', async () => {
+      if (!isElectronUpdate) {
+        showToast('Updates are only available in the installed app', 'info');
+        return;
+      }
+      if (updateStateText) updateStateText.textContent = 'Checking for updates…';
+      if (updateStateDetail) updateStateDetail.textContent = '';
+      const state = await updateApi.check();
+      applyUpdateStatus(state);
+    });
+  }
+
+  if (installUpdateBtn) {
+    installUpdateBtn.addEventListener('click', async () => {
+      if (!isElectronUpdate) return;
+      const state = await updateApi.getState();
+      if (state && state.downloaded) {
+        updateApi.restart();
+        return;
+      }
+      const result = await updateApi.download();
+      if (result && result.ok === false) {
+        showToast(result.error || 'Update failed to download', 'error');
+      }
+    });
+  }
+
+  if (isElectronUpdate) {
+    if (typeof updateApi.onStatus === 'function') {
+      updateApi.onStatus((state) => applyUpdateStatus(state));
+    }
+    if (typeof updateApi.onReady === 'function') {
+      updateApi.onReady((data) => {
+        showUpdateBanner('ready', data && data.version);
+      });
+    }
+    updateApi.getState().then((state) => applyUpdateStatus(state));
+  }
+
   // Push initial settings to iframes (immediate + on load)
   pushSettingsToIframes();
   pushBibleMaxFont();
@@ -966,6 +1280,15 @@
 
   // ── Presenter API Proxy ──
   const api = window.presenterApi;
+
+  if (api && typeof api.onDisplaysChanged === 'function') {
+    api.onDisplaysChanged(() => {
+      const msg = { type: 'displaysChanged' };
+      [bibleFrame, hymnFrame].forEach((frame) => {
+        if (frame && frame.contentWindow) frame.contentWindow.postMessage(msg, '*');
+      });
+    });
+  }
 
   window.addEventListener('message', (e) => {
     const data = e.data;

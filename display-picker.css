@@ -1,0 +1,178 @@
+/* display-picker.css
+ * Modern multi-select display dropdown shared by the Bible and Hymn presenters.
+ * Depends on theme.css variables (falls back to sane defaults).
+ */
+
+.dp {
+  position: relative;
+  width: 100%;
+  min-width: 0;
+}
+
+.dp-trigger {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  width: 100%;
+  padding: 9px 12px;
+  border: 1px solid var(--control-border, #3b4754);
+  border-radius: 12px;
+  background: var(--control-bg, #1f2937);
+  color: var(--text-main, #e5e7eb);
+  font-size: 0.82rem;
+  font-weight: 600;
+  text-align: left;
+  cursor: pointer;
+  transition: border-color 0.15s ease, box-shadow 0.15s ease;
+}
+
+.dp-trigger:hover {
+  border-color: var(--accent, #60a5fa);
+}
+
+.dp[data-open] .dp-trigger,
+.dp-trigger:focus-visible {
+  border-color: var(--accent, #60a5fa);
+  box-shadow: 0 0 0 3px rgba(96, 165, 250, 0.18);
+  outline: none;
+}
+
+.dp-trigger-label {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.dp-chevron {
+  flex: none;
+  display: inline-flex;
+  color: var(--text-muted, #9ca3af);
+  transition: transform 0.18s ease;
+}
+
+.dp[data-open] .dp-chevron {
+  transform: rotate(180deg);
+}
+
+.dp-panel {
+  position: absolute;
+  top: calc(100% + 6px);
+  left: 0;
+  right: 0;
+  min-width: 240px;
+  padding: 6px;
+  background: var(--panel-bg, #232f3b);
+  border: 1px solid var(--control-border, #3b4754);
+  border-radius: 14px;
+  box-shadow: 0 14px 36px rgba(0, 0, 0, 0.32);
+  z-index: 60;
+  opacity: 0;
+  transform: translateY(-4px) scale(0.98);
+  pointer-events: none;
+  transition: opacity 0.12s ease, transform 0.12s ease;
+}
+
+.dp-open-up .dp-panel {
+  top: auto;
+  bottom: calc(100% + 6px);
+  transform: translateY(4px) scale(0.98);
+}
+
+.dp[data-open] .dp-panel {
+  opacity: 1;
+  transform: none;
+  pointer-events: auto;
+}
+
+.dp-row {
+  position: relative;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 8px 10px;
+  border-radius: 9px;
+  font-size: 0.82rem;
+  color: var(--text-main, #e5e7eb);
+  cursor: pointer;
+  transition: background 0.1s ease;
+}
+
+.dp-row:hover {
+  background: rgba(148, 163, 184, 0.12);
+}
+
+.dp-row.is-selected {
+  background: rgba(96, 165, 250, 0.12);
+}
+
+.dp-input {
+  position: absolute;
+  opacity: 0;
+  width: 1px;
+  height: 1px;
+  margin: 0;
+  pointer-events: none;
+}
+
+.dp-box {
+  flex: none;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 18px;
+  height: 18px;
+  border-radius: 6px;
+  border: 1.5px solid var(--control-border, #3b4754);
+  color: transparent;
+  font-size: 12px;
+  line-height: 1;
+  transition: background 0.12s ease, border-color 0.12s ease, color 0.12s ease;
+}
+
+.dp-input:checked + .dp-box {
+  background: var(--accent, #60a5fa);
+  border-color: var(--accent, #60a5fa);
+  color: #fff;
+}
+
+.dp-input:focus-visible + .dp-box {
+  box-shadow: 0 0 0 3px rgba(96, 165, 250, 0.25);
+}
+
+.dp-label {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.dp-hint {
+  flex: none;
+  font-size: 0.72rem;
+  color: var(--text-muted, #9ca3af);
+  max-width: 40%;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.dp-badge {
+  flex: none;
+  padding: 2px 7px;
+  border-radius: 999px;
+  font-size: 0.62rem;
+  font-weight: 700;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+  background: rgba(34, 197, 94, 0.16);
+  color: #22c55e;
+}
+
+.dp-divider {
+  height: 1px;
+  margin: 5px 6px;
+  background: var(--control-border, #3b4754);
+}

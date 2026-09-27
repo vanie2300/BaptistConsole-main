@@ -43,7 +43,7 @@
         <li><a href="#ref-too-small">The projected verse reference is too small — how do I enlarge it?</a></li>
         <li><a href="#ref-not-visible">Why is my verse reference not showing?</a></li>
         <li><a href="#blurry-text">Text looks blurry or clipped on the projector</a></li>
-        <li><a href="#hymns-wont-exist">My added hymns disappeared after reinstalling the app</a></li>
+        <li><a href="#hymns-wont-exist">Will my added hymns survive an app update or reinstall?</a></li>
         <li><a href="#background-on-second-run">The opened presenter opens on the wrong display</a></li>
         <li><a href="#how-run">Do I need Node.js/npm to run the app?</a></li>
       </ul>
@@ -87,17 +87,17 @@
       <li><strong>Clipped</strong> — with a fixed preview frame the hymn center panel scrolls instead of clipping when content overflows the frame. On the projection itself, auto-fit keeps text inside bounds.</li>
     </ul>
 
-    <h2 id="hymns-wont-exist">My added hymns disappeared after reinstalling the app</h2>
+    <h2 id="hymns-wont-exist">Will my added hymns survive an app update or reinstall?</h2>
     <p>
-      The hymn library lives in <code>hymns/hymns.json</code>. In packaged builds this file sits inside the app's resources
-      (<code>process.resourcesPath/hymns/hymns.json</code>). Reinstalling the app can overwrite it.
+      Yes. Since v1.0.0 the hymn library is stored in the app's user-data folder (e.g.
+      <code>%APPDATA%/baptist-console/hymns/hymns.json</code>), not inside the app files. Updating or
+      reinstalling the app keeps your hymns. The built-in library is copied in only on first run.
     </p>
-    <p><strong>Fix:</strong> back up <code>hymns.json</code> before reinstalling, and restore it afterwards.</p>
 
     <h2 id="background-on-second-run">The presenter opens on the wrong display</h2>
     <p>
-      Presenters open on the display you selected in the module's display picker (falls back to the primary display if unset).
-      Re-pick the display and try again. If a monitor was unplugged/rearranged, ids change — pick the display once more.
+      Presenters open on the screen(s) picked in the module's <strong>Display</strong> dropdown — screens are shown by name or size (<code>All Displays</code> covers every screen; with nothing picked it falls back to the primary-configurable display).
+      Re-pick the screen and try again. If a monitor was unplugged/rearranged, ids change — pick the screen once more.
     </p>
 
     <h2 id="how-run">Do I need Node.js/npm to run the app?</h2>

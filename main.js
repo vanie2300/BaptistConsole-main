@@ -1,22 +1,47 @@
 const { app, BrowserWindow, ipcMain, screen, dialog } = require('electron');
 const path = require('path');
 const fs = require('fs');
+const { autoUpdater } = require('electron-updater');
 
 let mainWindow = null;
 let presenterDisplayId = null;
 const isDev = !app.isPackaged;
 
-function getHymnsPath() {
-  if (isDev) {
-    return path.join(__dirname, 'hymns', 'hymns.json');
-  }
-  return path.join(process.resourcesPath, 'hymns', 'hymns.json');
+function getBundledHymnsPath() {
+  // __dirname points inside app.asar when packaged (Electron patches fs), so
+  // this resolves the bundled library correctly in both dev and prod.
+  return path.join(__dirname, 'hymns', 'hymns.json');
 }
 
-function ensureHymnsDir() {
-  const dir = path.dirname(getHymnsPath());
+function getUserHymnsPath() {
+  return path.join(app.getPath('userData'), 'hymns', 'hymns.json');
+}
+
+function getHymnsPath() {
+  return isDev ? getBundledHymnsPath() : getUserHymnsPath();
+}
+
+function ensureHymnsDir(filePath) {
+  const dir = path.dirname(filePath);
   if (!fs.existsSync(dir)) {
     fs.mkdirSync(dir, { recursive: true });
+  }
+}
+
+function ensureUserHymnsFile() {
+  const userPath = getUserHymnsPath();
+  if (fs.existsSync(userPath)) return;
+  try {
+    const defaultData = fs.readFileSync(getBundledHymnsPath(), 'utf-8');
+    ensureHymnsDir(userPath);
+    fs.writeFileSync(userPath, defaultData, 'utf-8');
+  } catch (e) {
+    try {
+      ensureHymnsDir(userPath);
+      fs.writeFileSync(userPath, '[]', 'utf-8');
+    } catch {
+      // If even that fails, the app keeps running; reads will report the error.
+    }
   }
 }
 
@@ -27,6 +52,7 @@ ipcMain.handle('get-displays', () => {
   return displays.map((d) => ({
     id: d.id,
     isPrimary: d.isPrimary,
+    label: (d.label || '').trim(),
     size: { width: d.size.width, height: d.size.height },
     bounds: { x: d.bounds.x, y: d.bounds.y, width: d.bounds.width, height: d.bounds.height },
   }));
@@ -47,6 +73,7 @@ ipcMain.on('set-presenter-display', (_event, id) => {
 
 ipcMain.handle('get-hymns', async () => {
   try {
+    if (!isDev) ensureUserHymnsFile();
     const filePath = getHymnsPath();
     const data = await fs.promises.readFile(filePath, 'utf-8');
     return { ok: true, data: JSON.parse(data) };
@@ -60,8 +87,8 @@ ipcMain.handle('save-hymns', async (_event, hymns) => {
     if (!Array.isArray(hymns)) {
       return { ok: false, error: 'Invalid hymns data: expected an array' };
     }
-    ensureHymnsDir();
     const filePath = getHymnsPath();
+    ensureHymnsDir(filePath);
     await fs.promises.writeFile(filePath, JSON.stringify(hymns, null, 2), 'utf-8');
     return { ok: true };
   } catch (e) {
@@ -80,6 +107,174 @@ ipcMain.handle('pick-background-image', async () => {
   });
   if (result.canceled || !result.filePaths.length) return null;
   return result.filePaths[0];
+});
+
+// ── In-app updates ──
+
+const UPDATE_STATE_FILE = () => path.join(app.getPath('userData'), 'update-state.json');
+
+let updaterState = {
+  checking: false,
+  downloading: false,
+  available: false,
+  version: null,
+  downloaded: false,
+  error: null,
+  notify: false,
+};
+
+// Version "seen" so a release only notifies once — survives restarts. The
+// launch banner and the "Not now" button both write this marker; a *newer*
+// release always differs and gets its own notification.
+let seenVersion = null;
+let notifiedFor = null;
+
+function loadSeenVersion() {
+  try {
+    const data = JSON.parse(fs.readFileSync(UPDATE_STATE_FILE(), 'utf-8'));
+    seenVersion = data && typeof data.version === 'string' ? data.version : null;
+  } catch (e) {
+    seenVersion = null;
+  }
+}
+
+function saveSeenVersion() {
+  try {
+    fs.writeFileSync(UPDATE_STATE_FILE(), JSON.stringify({ version: seenVersion }), 'utf-8');
+  } catch (e) {
+    /* non-fatal */
+  }
+}
+
+function getUpdaterState() {
+  return Object.assign({}, updaterState);
+}
+
+function broadcastUpdaterState() {
+  const payload = getUpdaterState();
+  for (const w of BrowserWindow.getAllWindows()) {
+    if (!w.isDestroyed() && w.webContents && !w.webContents.isDestroyed()) {
+      w.webContents.send('update:status', payload);
+    }
+  }
+}
+
+function setUpdaterState(patch) {
+  updaterState = Object.assign({}, updaterState, patch);
+  broadcastUpdaterState();
+}
+
+function broadcastUpdateReady(version) {
+  for (const w of BrowserWindow.getAllWindows()) {
+    if (!w.isDestroyed() && w.webContents && !w.webContents.isDestroyed()) {
+      w.webContents.send('update:ready', { version: version || updaterState.version || 'latest' });
+    }
+  }
+}
+
+function setupAutoUpdater() {
+  autoUpdater.autoDownload = false;
+  autoUpdater.autoInstallOnAppQuit = true;
+
+  autoUpdater.on('checking-for-update', () => {
+    setUpdaterState({ checking: true, error: null });
+  });
+
+  autoUpdater.on('update-available', (info) => {
+    const version = info && typeof info.version === 'string' ? info.version : null;
+    if (!version || version === app.getVersion()) {
+      // Defensive: without a real, distinct version there is nothing to announce.
+      setUpdaterState({ checking: false, available: false, version: null, downloaded: false, notify: false, error: null });
+      return;
+    }
+    const notify = seenVersion !== version && notifiedFor !== version;
+    if (notify) {
+      notifiedFor = version;
+      seenVersion = version;
+      saveSeenVersion();
+    }
+    setUpdaterState({ checking: false, available: true, version, downloaded: false, notify, error: null });
+    if (notify) {
+      console.log('[updater] update v' + version + ' available');
+    }
+  });
+
+  autoUpdater.on('update-not-available', () => {
+    setUpdaterState({ checking: false, available: false, version: null, downloaded: false, notify: false, error: null });
+  });
+
+  autoUpdater.on('download-progress', () => {
+    setUpdaterState({ checking: false, downloading: true, notify: false });
+  });
+
+  autoUpdater.on('update-downloaded', (info) => {
+    const version = info && info.version ? info.version : updaterState.version;
+    setUpdaterState({ downloading: false, downloaded: true, notify: false });
+    broadcastUpdateReady(version);
+  });
+
+  autoUpdater.on('error', (err) => {
+    console.error('[updater] error:', err && err.message ? err.message : err);
+    setUpdaterState({ checking: false, downloading: false, error: err && err.message ? err.message : String(err) });
+  });
+}
+
+ipcMain.handle('update:get-state', () => getUpdaterState());
+
+ipcMain.handle('update:check', async () => {
+  if (isDev) {
+    setUpdaterState({ checking: false, available: false, error: 'Updates are disabled in development mode.' });
+    return getUpdaterState();
+  }
+  try {
+    loadSeenVersion();
+    setUpdaterState({ checking: true, error: null });
+    await autoUpdater.checkForUpdates();
+  } catch (e) {
+    setUpdaterState({ checking: false, error: e && e.message ? e.message : String(e) });
+  }
+  return getUpdaterState();
+});
+
+ipcMain.handle('update:download', async () => {
+  if (isDev) {
+    return { ok: false, error: 'Updates are disabled in development mode.' };
+  }
+  if (!updaterState.available) {
+    return { ok: false, error: 'No update available.' };
+  }
+  if (updaterState.downloaded || updaterState.downloading) {
+    return { ok: true, alreadyStarted: true };
+  }
+  try {
+    setUpdaterState({ downloading: true, notify: false });
+    const result = await autoUpdater.downloadUpdate();
+    if (result) {
+      setUpdaterState({ downloading: false, downloaded: true, notify: false });
+    }
+    return { ok: true };
+  } catch (e) {
+    setUpdaterState({ downloading: false, error: e && e.message ? e.message : String(e) });
+    return { ok: false, error: e && e.message ? e.message : String(e) };
+  }
+});
+
+ipcMain.on('update:defer', () => {
+  if (updaterState.version) {
+    seenVersion = updaterState.version;
+    saveSeenVersion();
+  }
+  setUpdaterState({ notify: false });
+});
+
+ipcMain.on('update:restart', () => {
+  if (isDev) return;
+  if (updaterState.downloaded) {
+    autoUpdater.quitAndInstall(false, true);
+  } else {
+    app.relaunch();
+    app.quit();
+  }
 });
 
 // ── Presenter window guards ──
@@ -205,14 +400,34 @@ function createMainWindow() {
     return { action: 'deny' };
   });
 
-  mainWindow.webContents.on('did-create-window', (win) => {
+  mainWindow.webContents.on('did-create-window', (win, details) => {
     guardPresenterWindow(win);
+    const findWindowDisplay = () => {
+      try {
+        const frameName = (details && details.frameName) || '';
+        const nameMatch = frameName.match(/^(?:bible-presenter|HymnPresentation)-d(\d+)$/);
+        if (nameMatch) {
+          const byName = screen.getAllDisplays().find((d) => d.id === Number(nameMatch[1]));
+          if (byName) return byName;
+        }
+        let url = '';
+        try {
+          url = win.webContents && win.webContents.getURL ? win.webContents.getURL() : '';
+        } catch (_e) { url = ''; }
+        const urlMatch = url.match(/[?&]display=(\d+)/);
+        if (urlMatch) {
+          const byUrl = screen.getAllDisplays().find((d) => d.id === Number(urlMatch[1]));
+          if (byUrl) return byUrl;
+        }
+      } catch (_e) { /* fall through to global + primary */ }
+      if (presenterDisplayId != null) {
+        return screen.getAllDisplays().find((d) => d.id === presenterDisplayId) || null;
+      }
+      return null;
+    };
     const placeOnDisplay = () => {
       if (win.isDestroyed()) return;
-      let target = null;
-      if (presenterDisplayId != null) {
-        target = screen.getAllDisplays().find((d) => d.id === presenterDisplayId) || null;
-      }
+      const target = findWindowDisplay();
       const bounds = (target || screen.getPrimaryDisplay()).bounds;
       win.setBounds(bounds);
       win.focus();
@@ -232,7 +447,33 @@ function createMainWindow() {
 // ── App Lifecycle ──
 
 app.whenReady().then(() => {
+  if (!isDev) ensureUserHymnsFile();
+  loadSeenVersion();
   createMainWindow();
+  setupAutoUpdater();
+
+  if (!isDev) {
+    // Check for updates shortly after launch, then again later in quiet periods.
+    setTimeout(() => {
+      autoUpdater.checkForUpdates().catch((e) => {
+        console.error('[updater] initial check failed:', e && e.message ? e.message : e);
+      });
+    }, 2000);
+  }
+
+  let displaysChangeTimer = null;
+  const broadcastDisplaysChanged = () => {
+    clearTimeout(displaysChangeTimer);
+    displaysChangeTimer = setTimeout(() => {
+      for (const w of BrowserWindow.getAllWindows()) {
+        if (!w.isDestroyed() && w.webContents && !w.webContents.isDestroyed()) {
+          w.webContents.send('displays-changed');
+        }
+      }
+    }, 200);
+  };
+  screen.on('display-added', broadcastDisplaysChanged);
+  screen.on('display-removed', broadcastDisplaysChanged);
 
   app.on('activate', () => {
     if (BrowserWindow.getAllWindows().length === 0) {

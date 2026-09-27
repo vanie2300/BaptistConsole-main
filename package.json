@@ -1,10 +1,13 @@
 {
   "name": "baptist-console",
-  "version": "1.0.0-dev",
+  "version": "1.0.0",
   "description": "Baptist Console — Church Presentation Suite",
   "main": "main.js",
   "author": "Jovanie Cangke",
   "license": "MIT",
+  "dependencies": {
+    "electron-updater": "^6.8.9"
+  },
   "scripts": {
     "start": "electron .",
     "icons": "png-to-ico icon.png > icon.ico",
@@ -25,6 +28,9 @@
       "theme.js",
       "shell.css",
       "shell.js",
+      "display-picker.css",
+      "display-picker.js",
+      "presenter-proxy.js",
       "bible/**/*",
       "hymns/**/*",
       "icon.png",
@@ -58,7 +64,14 @@
       ],
       "category": "Utility",
       "icon": "icon.png"
-    }
+    },
+    "publish": [
+      {
+        "provider": "github",
+        "owner": "vanie2300",
+        "repo": "BaptistConsole-main"
+      }
+    ]
   },
   "devDependencies": {
     "electron": "^33.0.0",

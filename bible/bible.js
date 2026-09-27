@@ -23,16 +23,31 @@ let isSearchResultsMode = false;
 let searchResults = [];
 let lastSearchQuery = "";
 
-let presentWindow = null;
+const presenterWindows = new Map(); // displayId (null = auto) -> Window
 let presenterStatusTimer = null;
-const PRESENTER_BIAS_DEFAULT = 1.3;
-let presenterFitBias = PRESENTER_BIAS_DEFAULT;
 let presenterAutoDisplayId = null;
 let presenterDisplayLabel = "";
-let presenterDisplayIsAuto = true;
+let displayPicker = null;
 
 const RECENT_SEARCH_KEY = "bibleRecentSearches";
 const MAX_RECENT_SEARCHES = 5;
+const SHOW_TITLES_KEY = "settings_bibleShowTitles";
+
+function titlesEnabled() {
+  try {
+    return localStorage.getItem(SHOW_TITLES_KEY) !== "false";
+  } catch {
+    return true;
+  }
+}
+
+function applyTitleVisibility() {
+  const enabled = titlesEnabled();
+  if (els.currentTitle) {
+    els.currentTitle.hidden = !enabled || !els.currentTitle.textContent;
+  }
+  document.querySelectorAll(".verse-row-note").forEach((n) => (n.hidden = !enabled));
+}
 
 // separate font sizes
 let centerFontSizePx = 50;
@@ -50,6 +65,7 @@ let presenterFontMax = (() => {
 const PRESENTER_BIAS_MIN = 0.7;
 const PRESENTER_BIAS_MAX = 1.55;
 const PRESENTER_BIAS_STEP = 0.06;
+let presenterFitBias = clampPresenterBias((Number(localStorage.getItem('settings_biblePresentSize')) || 130) / 100);
 
 // cached DOM elements
 const els = {};
@@ -60,10 +76,11 @@ document.addEventListener("DOMContentLoaded", () => {
   cacheDom();
   wireEvents();
   initPreviewToggle();
-  initPresenterDisplayPicker();
+initPresenterDisplayPicker();
   applyCenterFontSize(centerFontSizePx);
   setPresenterState(false);
   loadBibleData();
+  applyTitleVisibility();
 });
 
 // ======== DOM CACHE ========
@@ -75,7 +92,7 @@ function cacheDom() {
   els.displayBtn        = document.getElementById("displayBtn");
   els.previewToggle     = document.getElementById("previewToggle");
   els.presentStatus     = document.getElementById("presentStatus");
-  els.presenterDisplayWrap = document.getElementById("presenterDisplayWrap");
+els.presenterDisplayWrap = document.getElementById("presenterDisplayWrap");
   els.presenterDisplayPicker = document.getElementById("presenterDisplayPicker");
 
   els.searchToggle      = document.getElementById("searchToggle");
@@ -86,8 +103,9 @@ function cacheDom() {
   els.searchClear       = document.getElementById("searchClear");
   els.searchResultHint  = document.getElementById("searchResultHint");
 
-  els.currentReference  = document.getElementById("currentReference");
+els.currentReference  = document.getElementById("currentReference");
   els.currentText       = document.getElementById("currentText");
+  els.currentTitle      = document.getElementById("currentTitle");
   els.verseBody         = document.querySelector(".verse-body");
 
   els.prevVerseBtn      = document.getElementById("prevVerseBtn");
@@ -95,7 +113,6 @@ function cacheDom() {
 
   els.fontMinus         = document.getElementById("fontMinus");
   els.fontPlus          = document.getElementById("fontPlus");
-  els.fontAuto          = document.getElementById("fontAuto");
 
   els.statusMessage     = document.getElementById("statusMessage");
 
@@ -146,20 +163,12 @@ function wireEvents() {
     });
   }
 
-  if (els.fontPlus) {
+if (els.fontPlus) {
     els.fontPlus.addEventListener("click", () => {
       // center +1, presenter fit bias up
       centerFontSizePx = Math.min(CENTER_FONT_MAX, centerFontSizePx + 1);
       presenterFitBias = clampPresenterBias(presenterFitBias + PRESENTER_BIAS_STEP);
       applyCenterFontSize(centerFontSizePx);
-      setPresenterState(isPresenterOpen());
-      pushLiveVerseToPresenter();
-    });
-  }
-
-  if (els.fontAuto) {
-    els.fontAuto.addEventListener("click", () => {
-      presenterFitBias = PRESENTER_BIAS_DEFAULT;
       setPresenterState(isPresenterOpen());
       pushLiveVerseToPresenter();
     });
@@ -205,9 +214,17 @@ function wireEvents() {
         var consoleRef = document.getElementById('currentReference');
         if (consoleRef) consoleRef.style.fontSize = `calc(1rem * ${data.refSize} / 100)`;
       }
+      if (typeof data.showTitles === 'boolean') {
+        applyTitleVisibility();
+      }
+      if (typeof data.presentSize === 'number') {
+        presenterFitBias = clampPresenterBias(data.presentSize / 100);
+        setPresenterState(isPresenterOpen());
+        pushLiveVerseToPresenter();
+      }
     }
-    if ((data.type === "settingsUpdate" || data.type === "bibleSettingsUpdate" || data.type === "bibleMaxFontUpdate") && isFromParent && presentWindow && !presentWindow.closed) {
-      presentWindow.postMessage(data, "*");
+    if ((data.type === "settingsUpdate" || data.type === "bibleSettingsUpdate" || data.type === "bibleMaxFontUpdate") && isFromParent) {
+      forEachPresenterWindow((w) => w.postMessage(data, "*"));
     }
   });
 }
@@ -275,86 +292,22 @@ function onPreviewToggleChange() {
 
 function initPresenterDisplayPicker() {
   const api = window.presenterApi;
-  if (!api || !els.presenterDisplayWrap || !els.presenterDisplayPicker) return;
-
-  const stored = localStorage.getItem("presenterDisplayId");
-  const storedId = stored ? Number(stored) : null;
-  let autoLabel = "";
-
-const formatLabel = (display, index) =>
-    display.isPrimary ? "Primary" : `Display ${index + 1}`;
-
-  const pickAutoDisplay = (displays) =>
-    displays.find((display) => !display.isPrimary) || displays[0] || null;
-
-  api.getDisplays().then((displays) => {
-    if (!Array.isArray(displays) || displays.length === 0) return;
-    els.presenterDisplayWrap.hidden = false;
-    els.presenterDisplayPicker.innerHTML = '<option value="">Default Display</option>';
-    displays.forEach((display, index) => {
-      const option = document.createElement("option");
-      option.value = String(display.id);
-      option.textContent = formatLabel(display, index);
-      if (storedId && display.id === storedId) {
-        option.selected = true;
-      }
-      els.presenterDisplayPicker.appendChild(option);
-    });
-
-    const autoDisplay = pickAutoDisplay(displays);
-    presenterAutoDisplayId = autoDisplay ? autoDisplay.id : null;
-    if (autoDisplay) {
-      autoLabel = formatLabel(autoDisplay, displays.findIndex((d) => d.id === autoDisplay.id));
-    }
-
-    if (storedId) {
-      const storedDisplay = displays.find((display) => display.id === storedId);
-      if (storedDisplay) {
-        presenterDisplayIsAuto = false;
-        presenterDisplayLabel = formatLabel(
-          storedDisplay,
-          displays.findIndex((d) => d.id === storedId)
-        );
-        els.presenterDisplayPicker.value = String(storedId);
-        api.setPresenterDisplay(storedId);
-      } else {
-        presenterDisplayIsAuto = true;
-        presenterDisplayLabel = autoLabel;
-        if (presenterAutoDisplayId) {
-          els.presenterDisplayPicker.value = String(presenterAutoDisplayId);
-          api.setPresenterDisplay(presenterAutoDisplayId);
-        }
-      }
-    } else if (presenterAutoDisplayId) {
-      presenterDisplayIsAuto = true;
-      presenterDisplayLabel = autoLabel;
-      els.presenterDisplayPicker.value = String(presenterAutoDisplayId);
-      api.setPresenterDisplay(presenterAutoDisplayId);
-    } else {
-      presenterDisplayIsAuto = true;
-      presenterDisplayLabel = "";
-    }
-
-    setPresenterState(isPresenterOpen());
-  }).catch(() => {});
-
-  els.presenterDisplayPicker.addEventListener("change", () => {
-    const value = els.presenterDisplayPicker.value;
-    if (!value) {
-      localStorage.removeItem("presenterDisplayId");
-      api.setPresenterDisplay(null);
-      presenterDisplayIsAuto = true;
-      presenterDisplayLabel = autoLabel;
-      setPresenterState(isPresenterOpen());
-      return;
-    }
-    const displayId = Number(value);
-    localStorage.setItem("presenterDisplayId", String(displayId));
-    api.setPresenterDisplay(displayId);
-    presenterDisplayIsAuto = false;
-    presenterDisplayLabel = els.presenterDisplayPicker.selectedOptions[0]?.textContent || "";
-    setPresenterState(isPresenterOpen());
+  if (!api || !els.presenterDisplayWrap || !els.presenterDisplayPicker || !window.DisplayPicker) return;
+  if (displayPicker) return;
+  displayPicker = window.DisplayPicker.create(els.presenterDisplayPicker, {
+    api,
+    onChange: onPickerChange,
   });
+}
+
+function onPickerChange(s) {
+  presenterDisplayLabel = s.label || "";
+  presenterAutoDisplayId = s.autoDisplayId ?? null;
+  setPresenterState(isPresenterOpen());
+}
+
+function getSelectedPresenterDisplayIds() {
+  return displayPicker ? displayPicker.getSelectedIds() : [];
 }
 
 // ======== LOAD BIBLE DATA ========
@@ -419,12 +372,13 @@ function buildBibleStructure() {
       bible[bookSlug][chapter] = {};
     }
 
-    const meta = bookMeta[bookSlug];
+const meta = bookMeta[bookSlug];
     const displayName = meta.displayName;
 
     bible[bookSlug][chapter][verse] = {
       text: value.text || "",
       reference: value.reference || `${displayName} ${chapter}:${verse}`,
+      title: value.title || "",
     };
 
     meta.chapters.add(chapter);
@@ -577,9 +531,16 @@ function renderChapterVerses(bookSlug, chapter) {
     num.className = "verse-row-number";
     num.textContent = v;
 
-    const txt = document.createElement("div");
+const txt = document.createElement("div");
     txt.className = "verse-row-text";
     txt.textContent = verseData.text;
+
+    if (verseData.title) {
+      const note = document.createElement("div");
+      note.className = "verse-row-note";
+      note.textContent = verseData.title;
+      txt.insertBefore(note, txt.firstChild);
+    }
 
     row.appendChild(num);
     row.appendChild(txt);
@@ -591,6 +552,7 @@ function renderChapterVerses(bookSlug, chapter) {
     els.versesList.appendChild(row);
   }
 
+  applyTitleVisibility();
   highlightCurrentVerseRow(false);
 }
 
@@ -612,8 +574,15 @@ function renderSearchResults(list) {
     num.className = "verse-row-number";
     num.textContent = `${item.chapter}:${item.verse}`;
 
-    const txt = document.createElement("div");
+const txt = document.createElement("div");
     txt.className = "verse-row-text";
+    const itemTitle = bible?.[item.bookSlug]?.[item.chapter]?.[item.verse]?.title;
+    if (itemTitle) {
+      const note = document.createElement("div");
+      note.className = "verse-row-note";
+      note.textContent = itemTitle;
+      txt.appendChild(note);
+    }
     const refSpan = document.createElement("span");
     refSpan.className = "search-ref";
     refSpan.textContent = `${item.reference} - `;
@@ -630,6 +599,8 @@ function renderSearchResults(list) {
 
     els.versesList.appendChild(row);
   }
+
+  applyTitleVisibility();
 }
 
 function appendHighlightedText(container, text, query) {
@@ -680,12 +651,20 @@ function updateVerseDisplay(verseData) {
     els.currentReference.textContent = "No verse selected";
     els.currentText.textContent =
       "Select a book, chapter, and verse from the left, or use the search dropdown above.";
+    if (els.currentTitle) {
+      els.currentTitle.textContent = "";
+      els.currentTitle.hidden = true;
+    }
     autoFitCenterText(centerFontSizePx);
     return;
   }
-  els.currentReference.textContent = verseData.reference || "Verse";
+els.currentReference.textContent = verseData.reference || "Verse";
   els.currentText.textContent = verseData.text || "";
+  if (els.currentTitle) {
+    els.currentTitle.textContent = verseData.title || "";
+  }
   autoFitCenterText(centerFontSizePx);
+  applyTitleVisibility();
 }
 
 function getCurrentVerseData() {
@@ -706,11 +685,12 @@ function getCurrentLocation() {
 function setLiveVerse(book, chapter, verse) {
   const verseData = bible?.[book]?.[chapter]?.[verse];
   if (!verseData) return false;
-  liveVerse = {
+liveVerse = {
     book,
     chapter,
     verse,
     reference: verseData.reference || "",
+    title: verseData.title || "",
     text: verseData.text || "",
   };
   return true;
@@ -721,7 +701,8 @@ function hasLiveVerse() {
 }
 
 function isPresenterOpen() {
-  return Boolean(presentWindow && !presentWindow.closed);
+  prunePresenterWindows();
+  return presenterWindows.size > 0;
 }
 
 function showLiveVerse(book, chapter, verse) {
@@ -1151,10 +1132,7 @@ function setPresenterState(isOpen) {
     els.presentStatus.textContent = [base, presenterDisplayLabel, mode].filter(Boolean).join(" · ");
     els.presentStatus.classList.toggle("is-active", isOpen);
   }
-  if (els.fontAuto) {
-    els.fontAuto.classList.toggle("active", Math.abs(presenterFitBias - PRESENTER_BIAS_DEFAULT) < 0.01);
-  }
-if (els.displayBtn) {
+  if (els.displayBtn) {
     els.displayBtn.textContent = isOpen ? "Display Active" : "Display Verse";
   }
 }
@@ -1163,15 +1141,32 @@ function clampPresenterBias(value) {
   return Math.min(PRESENTER_BIAS_MAX, Math.max(PRESENTER_BIAS_MIN, value));
 }
 
+function prunePresenterWindows() {
+  for (const [id, win] of presenterWindows) {
+    if (!win || win.closed) presenterWindows.delete(id);
+  }
+}
+
+function forEachPresenterWindow(fn) {
+  for (const [id, win] of presenterWindows) {
+    if (win && !win.closed && fn) fn(win, id);
+  }
+}
+
 function monitorPresenterWindow() {
   if (presenterStatusTimer) return;
   presenterStatusTimer = setInterval(() => {
-    if (presentWindow && presentWindow.closed) {
-      presentWindow = null;
+    const before = presenterWindows.size;
+    prunePresenterWindows();
+    if (presenterWindows.size === 0) {
       setPresenterState(false);
-      clearInterval(presenterStatusTimer);
-      presenterStatusTimer = null;
+      if (presenterStatusTimer) {
+        clearInterval(presenterStatusTimer);
+        presenterStatusTimer = null;
+      }
+      return;
     }
+    if (presenterWindows.size !== before) setPresenterState(true);
   }, 1000);
 }
 
@@ -1181,36 +1176,17 @@ function monitorPresenterWindow() {
 
 function openPresenterWindow() {
   const api = window.presenterApi;
-  if (api) {
-    const stored = localStorage.getItem("presenterDisplayId");
-    const storedId = stored ? Number(stored) : null;
-    const preferredId = storedId ?? presenterAutoDisplayId ?? null;
-    api.setPresenterDisplay(preferredId);
-  }
+  const selected = getSelectedPresenterDisplayIds();
+  const targets = selected.length > 0 ? selected : [null];
 
-  if (presentWindow && !presentWindow.closed) {
-    presentWindow.focus();
-    setPresenterState(true);
-    monitorPresenterWindow();
-    return;
-  }
+  const buildHtml = (currentRef, currentText, currentTitle) => {
+    const initialRef = currentRef || "";
+    const initialText = currentText || "";
+    const initialTitle = currentTitle || "";
+    const initialSize = presenterFontSizePx + "px";
+    const initialFitBias = presenterFitBias;
 
-  presentWindow = window.open("", "bible-presenter", "width=1024,height=768");
-  if (!presentWindow) {
-    alert("Popup blocked. Please allow popups for this site.");
-    return;
-  }
-
-  const initialData = liveVerse || {
-    reference: els.currentReference.textContent || "",
-    text: els.currentText.textContent || "",
-  };
-  const initialRef = initialData.reference || "";
-  const initialText = initialData.text || "";
-  const initialSize = presenterFontSizePx + "px";
-  const initialFitBias = presenterFitBias;
-
-  const html = `
+    return `
 <!DOCTYPE html>
 <html>
 <head>
@@ -1259,9 +1235,20 @@ function openPresenterWindow() {
       letter-spacing: 0.2em;
       text-transform: uppercase;
       color: var(--present-accent, #60a5fa);
-      margin-bottom: 0.9rem;
+      margin-bottom: 0.5rem;
       text-align: center;
       max-width: min(92vw, 1400px);
+    }
+    #presentTitle {
+      font-size: clamp(1rem, 1.6vw, 1.5rem);
+      font-weight: 500;
+      font-style: italic;
+      letter-spacing: normal;
+      color: var(--present-text, #ffffff);
+      opacity: 0.65;
+      margin-bottom: 0.9rem;
+      text-align: center;
+      max-width: min(88vw, 1100px);
     }
     #presentText {
       font-size: ${initialSize};
@@ -1275,6 +1262,7 @@ function openPresenterWindow() {
 <body>
   <div id="bgImageLayer"></div>
   <div id="presentRef"></div>
+  <div id="presentTitle"></div>
   <div id="presentText"></div>
   <script>
     function applyThemeFromStorage() {
@@ -1333,6 +1321,10 @@ function openPresenterWindow() {
           var presentRefEl = document.getElementById('presentRef');
           if (presentRefEl) presentRefEl.style.fontSize = 'calc(clamp(0.9rem, 1.8vw, 1.6rem) * ' + evt.data.refSize + ' / 100)';
         }
+        if (typeof evt.data.showTitles === 'boolean') {
+          var titleEl = document.getElementById('presentTitle');
+          if (titleEl) titleEl.style.display = evt.data.showTitles ? '' : 'none';
+        }
       }
       if (evt.data.type === 'bibleMaxFontUpdate' && typeof evt.data.maxFont === 'number') {
         FIT_FONT_MAX = evt.data.maxFont;
@@ -1371,7 +1363,7 @@ const isElectron = navigator.userAgent.toLowerCase().includes('electron');
 return Number.isFinite(num) ? num : fallback;
     }
 
-    function getAvailableSpace(refEl) {
+function getAvailableSpace(refEl) {
       const bodyRect = document.body.getBoundingClientRect();
       const bodyStyle = getComputedStyle(document.body);
       const refStyle = getComputedStyle(refEl);
@@ -1380,8 +1372,15 @@ return Number.isFinite(num) ? num : fallback;
       const paddingY = (parseFloat(bodyStyle.paddingTop) || 0) + (parseFloat(bodyStyle.paddingBottom) || 0);
       const refMargins = (parseFloat(refStyle.marginTop) || 0) + (parseFloat(refStyle.marginBottom) || 0);
 
+      let extraHeight = 0;
+      const titleEl = document.getElementById('presentTitle');
+      if (titleEl && getComputedStyle(titleEl).display !== 'none' && titleEl.textContent) {
+        const titleStyle = getComputedStyle(titleEl);
+        extraHeight = titleEl.offsetHeight + (parseFloat(titleStyle.marginTop) || 0) + (parseFloat(titleStyle.marginBottom) || 0);
+      }
+
       const width = Math.floor(bodyRect.width - paddingX - 4);
-      const height = Math.floor(bodyRect.height - paddingY - refEl.offsetHeight - refMargins - 4);
+      const height = Math.floor(bodyRect.height - paddingY - refEl.offsetHeight - refMargins - extraHeight - 4);
 
       if (width <= 0 || height <= 0) return null;
       return { width, height };
@@ -1469,8 +1468,11 @@ return Number.isFinite(num) ? num : fallback;
           fitBias = clamp(incomingBias, FIT_BIAS_MIN, FIT_BIAS_MAX);
         }
       }
-      if (data.reference !== undefined) {
+if (data.reference !== undefined) {
         document.getElementById('presentRef').textContent = data.reference || '';
+      }
+      if (data.title !== undefined) {
+        document.getElementById('presentTitle').textContent = data.title || '';
       }
       if (data.text !== undefined) {
         document.getElementById('presentText').textContent = data.text || '';
@@ -1526,7 +1528,7 @@ maximizeWindow();
     window.addEventListener('beforeunload', function() {
       clearFitQueue();
     });
-    (function() {
+(function() {
       var showRef = localStorage.getItem('settings_bibleShowRef');
       var refEl = document.getElementById('presentRef');
       if (refEl && showRef === 'false') refEl.style.display = 'none';
@@ -1534,9 +1536,13 @@ maximizeWindow();
       if (refEl && refSize !== 100) {
         refEl.style.fontSize = 'calc(clamp(0.9rem, 1.8vw, 1.6rem) * ' + refSize + ' / 100)';
       }
+      var showTitles = localStorage.getItem('settings_bibleShowTitles');
+      var titleEl = document.getElementById('presentTitle');
+      if (titleEl && showTitles === 'false') titleEl.style.display = 'none';
     })();
 updateVerse(${safeJsonStringify({
       reference: initialRef,
+      title: initialTitle,
       text: initialText,
       size: initialSize,
       fitBias: initialFitBias,
@@ -1544,34 +1550,63 @@ updateVerse(${safeJsonStringify({
   <\/script>
 </body>
 </html>
-    `;
-  presentWindow.document.open();
-  presentWindow.document.write(html);
-  presentWindow.document.close();
-  presentWindow.addEventListener("beforeunload", () => {
-    presentWindow = null;
-    setPresenterState(false);
-    if (presenterStatusTimer) {
-      clearInterval(presenterStatusTimer);
-      presenterStatusTimer = null;
+`;
+    return html;
+  };
+
+  const initialData = (liveVerse || getCurrentVerseData()) || {
+    reference: els.currentReference.textContent || "",
+    text: els.currentText.textContent || "",
+  };
+  const html = buildHtml(initialData.reference || "", initialData.text || "", initialData.title || "");
+
+  let touched = false;
+  targets.forEach((displayId) => {
+    const existing = presenterWindows.get(displayId);
+    if (existing && !existing.closed) {
+      existing.focus();
+      touched = true;
+      return;
     }
+    const name = displayId == null ? "bible-presenter-auto" : `bible-presenter-d${displayId}`;
+    const popup = window.open("", name, "width=1024,height=768");
+    if (!popup) return;
+    if (displayId == null && api) {
+      const stored = localStorage.getItem("presenterDisplayId");
+      const storedId = stored ? Number(stored) : null;
+      api.setPresenterDisplay(storedId ?? presenterAutoDisplayId ?? null);
+    }
+    popup.document.open();
+    popup.document.write(html);
+    popup.document.close();
+    presenterWindows.set(displayId, popup);
+    popup.addEventListener("beforeunload", () => {
+      presenterWindows.delete(displayId);
+      setPresenterState(isPresenterOpen());
+      monitorPresenterWindow();
+    });
+    touched = true;
   });
-  setPresenterState(true);
+  if (!touched) {
+    alert("Popup blocked. Please allow popups for this site.");
+    return;
+  }
+  setPresenterState(isPresenterOpen());
   monitorPresenterWindow();
 }
 
 function pushLiveVerseToPresenter() {
-  if (!presentWindow || presentWindow.closed) return;
   const verse = liveVerse || getCurrentVerseData();
   if (!verse) return;
   const payload = {
     type: "verseUpdate",
     reference: verse.reference || "",
+    title: verse.title || "",
     text: verse.text || "",
     size: presenterFontSizePx + "px",
     fitBias: presenterFitBias,
   };
-  presentWindow.postMessage(payload, "*");
+  forEachPresenterWindow((w) => w.postMessage(payload, "*"));
 }
 
 // ======== SAVE / RESTORE LAST LOCATION ========

@@ -81,7 +81,7 @@
       <tr><td><code>window-minimize</code></td><td>Minimize the main console window.</td></tr>
       <tr><td><code>window-maximize</code></td><td>Toggle maximize/restore on the main window.</td></tr>
       <tr><td><code>window-close</code></td><td>Close the main window.</td></tr>
-      <tr><td><code>set-presenter-display</code></td><td>Record which display (by id) presenters should open on.</td></tr>
+      <tr><td><code>set-presenter-display</code></td><td>Record the display (by id) a new presenter window should open on. Also the fallback when a window's name carries no display id.</td></tr>
       <tr><td><code>presenter-close-window</code></td><td>Destroy the presenter window that sent it (Esc path).</td></tr>
     </table>
 
@@ -104,6 +104,7 @@
 
     <h2 id="messages">Inter-frame messages</h2>
     <p>All cross-window communication uses <code>postMessage</code> with a string <code>type</code>. The console → iframe → presenter-window chain keeps modules isolated.</p>
+    <p><strong>Multi-screen presenters:</strong> the module's <strong>Display</strong> picker is a modern dropdown (shared component <code>display-picker.js</code> / <code>display-picker.css</code>) listing each screen by name or size (primary first with a badge). A row acts like a checkbox; <code>Auto</code> clears the explicit choice, <code>All Displays</code> selects every screen. Updates — <code>verseUpdate</code>, <code>navigate</code>, and settings messages — are broadcast to every open projector. Each window's <em>name</em> carries its display id (<code>bible-presenter-d&lt;id&gt;</code> / <code>HymnPresentation-d&lt;id&gt;</code>); <code>main.js</code> reads it from <code>details.frameName</code> in <code>did-create-window</code> to place the window, falling back to the <code>set-presenter-display</code> id and then the primary display. Defaults: with one display detected, it is pre-selected; when more than one display is detected nothing is picked (no specific screen targeted). Display hot-plugs are pushed to the pickers (<code>displays-changed</code> broadcast + <code>onDisplaysChanged</code>) so new screens appear without a restart.</p>
 
     <h3>Console → iframes</h3>
     <table>
@@ -159,10 +160,15 @@
       <tr><td><code>biblePresenterFontMax</code></td><td><code>800</code></td><td>Bible verse auto-fit ceiling (px).</td></tr>
       <tr><td><code>settings_bibleShowRef</code></td><td><code>true</code></td><td>Show the projected verse reference.</td></tr>
       <tr><td><code>settings_bibleRefSize</code></td><td><code>100</code></td><td>Reference size scale (50–200%).</td></tr>
+      <tr><td><code>settings_bibleShowTitles</code></td><td><code>true</code></td><td>Show psalm superscriptions in a smaller, muted style (stored in the verse's <code>title</code> field).</td></tr>
+      <tr><td><code>settings_biblePresentSize</code></td><td><code>130</code></td><td>Projected verse text scale (70–155%, the auto-fit bias).</td></tr>
+      <tr><td><code>presenterDisplays</code></td><td><em>absent</em></td><td>Display choice for the presenter dropdown: comma-separated display ids picked (e.g. <code>2,3</code>; each gets its own projector window) or <code>all</code> when every screen is picked. Any stored value without a matching screen is ignored. Absent = nothing picked ("Auto" window on the primary-configurable display).</td></tr>
+      <tr><td><code>presenterDisplayId</code></td><td><em>absent</em></td><td>Legacy single-display id; on load it pre-selects that display in the picker.</td></tr>
       <tr><td><code>settings_hymnAlign</code></td><td><code>left</code></td><td>Hymn text alignment.</td></tr>
       <tr><td><code>settings_hymnLayout</code></td><td><code>full</code></td><td>Full or compact layout.</td></tr>
       <tr><td><code>settings_hymnShowNumbers</code></td><td><code>true</code></td><td>Show "Verse N" labels.</td></tr>
       <tr><td><code>settings_hymnTitleSize</code></td><td><code>7</code></td><td>Default title size (vw).</td></tr>
+      <tr><td><code>settings_hymnFontSize</code></td><td><code>7</code></td><td>Scales the auto-fitted lyrics size (7 = fitted size).</td></tr>
       <tr><td><code>settings_hymnTransition</code></td><td><code>none</code></td><td>Slide transition type.</td></tr>
     </table>
 

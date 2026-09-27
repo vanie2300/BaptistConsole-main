@@ -174,21 +174,8 @@ body {
   box-shadow: inset 0 1px 0 rgba(0, 0, 0, 0.05);
 }
 
-.presenter-select {
-  width: 150px;
-  padding: 6px 12px;
-  border-radius: 12px;
-  border: 1px solid var(--control-border);
-  background: var(--control-bg);
-  color: var(--text-main);
-  font-size: 0.85rem;
-  font-weight: 600;
-  outline: none;
-}
-
-.presenter-select:focus {
-  border-color: rgba(96, 165, 250, 0.6);
-  box-shadow: 0 0 0 2px rgba(96, 165, 250, 0.2);
+.presenter-pill .dp {
+  width: 240px;
 }
 
 .panel-left {

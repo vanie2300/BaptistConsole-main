@@ -22,7 +22,7 @@
     modalChorus: document.getElementById('modalChorus'),
     closeModalBtn: document.getElementById('closeModalBtn'),
     cancelModalBtn: document.getElementById('cancelModalBtn'),
-    presenterDisplayWrap: document.getElementById('presenterDisplayWrap'),
+presenterDisplayWrap: document.getElementById('presenterDisplayWrap'),
     presenterDisplayPicker: document.getElementById('presenterDisplayPicker'),
   };
 
@@ -33,14 +33,13 @@
     selectedId: null,
     slides: [],
     currentIndex: 0,
-    presentationWindow: null,
+    presenterWindows: new Map(),
   };
 
-  let presenterStatusTimer = null;
+let presenterStatusTimer = null;
   let presenterAutoDisplayId = null;
   let presenterDisplayLabel = '';
-  let presenterDisplayIsAuto = true;
-  let presenterAutoDisplayLabel = '';
+  let displayPicker = null;
 
   const setStatus = (msg, isError = false) => {
     refs.status.textContent = msg || '';
@@ -59,16 +58,38 @@ const setPresenterState = (isOpen) => {
     }
   };
 
-  const monitorPresenterWindow = () => {
+const monitorPresenterWindow = () => {
     if (presenterStatusTimer) return;
     presenterStatusTimer = setInterval(() => {
-      if (state.presentationWindow && state.presentationWindow.closed) {
-        state.presentationWindow = null;
+      const before = state.presenterWindows.size;
+      prunePresenterWindows();
+      if (state.presenterWindows.size === 0) {
         setPresenterState(false);
-        clearInterval(presenterStatusTimer);
-        presenterStatusTimer = null;
+        if (presenterStatusTimer) {
+          clearInterval(presenterStatusTimer);
+          presenterStatusTimer = null;
+        }
+        return;
       }
+      if (state.presenterWindows.size !== before) setPresenterState(true);
     }, 1000);
+  };
+
+  const prunePresenterWindows = () => {
+    for (const [id, win] of state.presenterWindows) {
+      if (!win || win.closed) state.presenterWindows.delete(id);
+    }
+  };
+
+  const forEachPresenterWindow = (fn) => {
+    for (const [id, win] of state.presenterWindows) {
+      if (win && !win.closed && fn) fn(win, id);
+    }
+  };
+
+  const isPresenterOpen = () => {
+    prunePresenterWindows();
+    return state.presenterWindows.size > 0;
   };
 
   const escapeHtml = (text = '') => text.replace(/[&<>"']/g, (m) => ({
@@ -119,6 +140,7 @@ const getHymnSettings = () => ({
     layout: localStorage.getItem('settings_hymnLayout') || 'full',
     showNumbers: localStorage.getItem('settings_hymnShowNumbers') !== 'false',
     titleSize: Number(localStorage.getItem('settings_hymnTitleSize')) || 7,
+    fontSize: Number(localStorage.getItem('settings_hymnFontSize')) || 7,
     transition: localStorage.getItem('settings_hymnTransition') || 'none',
   });
 
@@ -143,7 +165,7 @@ const getHymnSettings = () => ({
     }
 
     let fontSize;
-    if (mode === 'current') fontSize = '3vw';
+    if (mode === 'current') fontSize = (3 * (settings.fontSize / 7)).toFixed(2) + 'vw';
     else if (mode === 'next') fontSize = '1.4rem';
     else fontSize = '0.8rem';
     wrapper.style.fontSize = fontSize;
@@ -189,10 +211,14 @@ const renderList = () => {
     refs.nextSlide.innerHTML = next ? slideToHtml(next, 'next') : '<em>End of hymn</em>';
     fitFrameText(refs.nextSlide, 11);
     if (refs.currentHymnVerse) {
-      const label =
-        current.type === 'title' ? 'Title' :
-        current.type === 'chorus' ? 'Chorus' :
-        current.type === 'verse' ? `Verse ${current.number}` : '—';
+      const totalVerses = state.slides.reduce((m, s) => (s.type === 'verse' ? Math.max(m, s.number || 0) : m), 0);
+      let label;
+      if (current.type === 'title') label = 'Title';
+      else if (current.type === 'verse') {
+        label = current.number === totalVerses ? 'Last verse' : `${current.number}/${totalVerses}`;
+      }
+      else if (current.type === 'chorus') label = 'Chorus';
+      else label = '—';
       refs.currentHymnVerse.textContent = label;
     }
 
@@ -266,11 +292,11 @@ const renderList = () => {
     if (!state.slides.length) return;
     const nextIndex = Math.min(Math.max(0, state.currentIndex + step), state.slides.length - 1);
     if (nextIndex === state.currentIndex) return;
-    state.currentIndex = nextIndex;
+state.currentIndex = nextIndex;
     renderSlides();
-    if (state.presentationWindow && !state.presentationWindow.closed) {
-      state.presentationWindow.postMessage({ type: 'navigate', currentIndex: state.currentIndex }, '*');
-    }
+    forEachPresenterWindow((win) => {
+      win.postMessage({ type: 'navigate', currentIndex: state.currentIndex }, '*');
+    });
   };
 
   const selectHymn = (idx) => {
@@ -301,63 +327,73 @@ const renderList = () => {
     updateDeleteState();
   };
 
-  const startPresentation = () => {
+const startPresentation = () => {
     if (!state.slides.length) return;
     const api = window.presenterApi;
-    if (api) {
-      const stored = localStorage.getItem('presenterDisplayId');
-      const storedId = stored ? Number(stored) : null;
-      const preferredId = storedId ?? presenterAutoDisplayId ?? null;
-      api.setPresenterDisplay(preferredId);
-    }
-    if (state.presentationWindow && !state.presentationWindow.closed) {
-      state.presentationWindow.focus();
-state.presentationWindow.postMessage({
-        type: 'init',
-        slides: state.slides,
-        currentIndex: state.currentIndex,
-        ...getHymnSettings(),
-      }, '*');
-      setPresenterState(true);
-      monitorPresenterWindow();
-      return;
-    }
+    const selected = getSelectedPresenterDisplayIds();
+    const targets = selected.length > 0 ? selected : [null];
 
-    const popup = window.open('presentation.html', 'HymnPresentation', 'width=960,height=720');
-    if (!popup) {
-      alert('Popup blocked! Please allow popups for this site.');
-      return;
-    }
-
-    state.presentationWindow = popup;
-const sendInit = () => {
-      popup.postMessage({
+    const sendInitTo = (win) => {
+      win.postMessage({
         type: 'init',
         slides: state.slides,
         currentIndex: state.currentIndex,
         ...getHymnSettings(),
       }, '*');
     };
-    popup.onload = sendInit;
-    setTimeout(sendInit, 300);
-    popup.addEventListener('beforeunload', () => {
-      state.presentationWindow = null;
-      setPresenterState(false);
-      if (presenterStatusTimer) {
-        clearInterval(presenterStatusTimer);
-        presenterStatusTimer = null;
+
+    let touched = false;
+    targets.forEach((displayId) => {
+      const existing = state.presenterWindows.get(displayId);
+      if (existing && !existing.closed) {
+        existing.focus();
+        sendInitTo(existing);
+        touched = true;
+        return;
       }
+      const name = displayId == null ? 'HymnPresentation-auto' : `HymnPresentation-d${displayId}`;
+      const popup = window.open('presentation.html', name, 'width=960,height=720');
+      if (!popup) {
+        if (displayId == null && api) {
+          const stored = localStorage.getItem('presenterDisplayId');
+          api.setPresenterDisplay(stored ? Number(stored) : presenterAutoDisplayId ?? null);
+        }
+        return;
+      }
+      popup.onload = () => sendInitTo(popup);
+      setTimeout(() => sendInitTo(popup), 300);
+      state.presenterWindows.set(displayId, popup);
+      popup.addEventListener('beforeunload', () => {
+        state.presenterWindows.delete(displayId);
+        setPresenterState(isPresenterOpen());
+        monitorPresenterWindow();
+      });
+      touched = true;
     });
-    setPresenterState(true);
+
+    if (!touched) {
+      alert('Popup blocked! Please allow popups for this site.');
+      return;
+    }
+    setPresenterState(isPresenterOpen());
     monitorPresenterWindow();
   };
 
 const handleMessage = (event) => {
     const data = event.data || {};
     if (data.type === 'navigateFromPopup') {
-      if (state.presentationWindow && event.source === state.presentationWindow) {
+      let isFromPresenter = false;
+      forEachPresenterWindow((win) => {
+        if (event.source === win) isFromPresenter = true;
+      });
+      if (isFromPresenter) {
         state.currentIndex = data.currentIndex;
         renderSlides();
+        forEachPresenterWindow((win) => {
+          if (event.source !== win) {
+            win.postMessage({ type: 'navigate', currentIndex: state.currentIndex }, '*');
+          }
+        });
       }
       return;
     }
@@ -365,8 +401,10 @@ const handleMessage = (event) => {
     if (data.type === 'hymnSettingsUpdate') {
       renderSlides();
     }
-    if ((data.type === 'settingsUpdate' || data.type === 'hymnSettingsUpdate') && state.presentationWindow && !state.presentationWindow.closed) {
-      state.presentationWindow.postMessage(data, '*');
+    if (data.type === 'settingsUpdate' || data.type === 'hymnSettingsUpdate') {
+      forEachPresenterWindow((win) => {
+        win.postMessage(data, '*');
+      });
     }
   };
 
@@ -557,91 +595,24 @@ setStatus(`Deleted "${hymn.title}". Saving hymns.json...`);
     }
   };
 
+const onPickerChange = (s) => {
+    presenterDisplayLabel = s.label || '';
+    presenterAutoDisplayId = s.autoDisplayId ?? null;
+    setPresenterState(isPresenterOpen());
+  };
+
   const initPresenterDisplayPicker = () => {
     const api = window.presenterApi;
-    if (!api || !refs.presenterDisplayWrap || !refs.presenterDisplayPicker) return;
-
-    const stored = localStorage.getItem('presenterDisplayId');
-    const storedId = stored ? Number(stored) : null;
-    let autoLabel = '';
-
-const formatLabel = (display, index) =>
-      display.isPrimary ? 'Primary' : `Display ${index + 1}`;
-
-    const pickAutoDisplay = (displays) =>
-      displays.find((display) => !display.isPrimary) || displays[0] || null;
-
-    api.getDisplays().then((displays) => {
-      if (!Array.isArray(displays) || displays.length === 0) return;
-      refs.presenterDisplayWrap.hidden = false;
-      refs.presenterDisplayPicker.innerHTML = '<option value="">Auto</option>';
-      displays.forEach((display, index) => {
-        const option = document.createElement('option');
-        option.value = String(display.id);
-        option.textContent = formatLabel(display, index);
-        if (storedId && display.id === storedId) {
-          option.selected = true;
-        }
-        refs.presenterDisplayPicker.appendChild(option);
-      });
-
-      const autoDisplay = pickAutoDisplay(displays);
-      presenterAutoDisplayId = autoDisplay ? autoDisplay.id : null;
-      presenterAutoDisplayLabel = '';
-      if (autoDisplay) {
-        autoLabel = formatLabel(autoDisplay, displays.findIndex((d) => d.id === autoDisplay.id));
-        presenterAutoDisplayLabel = autoLabel;
-      }
-
-if (storedId) {
-        const storedDisplay = displays.find((display) => display.id === storedId);
-        if (storedDisplay) {
-          presenterDisplayIsAuto = false;
-          presenterDisplayLabel = formatLabel(
-            storedDisplay,
-            displays.findIndex((d) => d.id === storedId)
-          );
-          refs.presenterDisplayPicker.value = String(storedId);
-          api.setPresenterDisplay(storedId);
-        } else {
-          localStorage.removeItem('presenterDisplayId');
-          presenterDisplayIsAuto = true;
-          presenterDisplayLabel = presenterAutoDisplayLabel;
-          refs.presenterDisplayPicker.value = '';
-          if (presenterAutoDisplayId) {
-            api.setPresenterDisplay(presenterAutoDisplayId);
-          }
-        }
-      } else if (presenterAutoDisplayId) {
-        presenterDisplayIsAuto = true;
-        presenterDisplayLabel = presenterAutoDisplayLabel;
-        refs.presenterDisplayPicker.value = '';
-        api.setPresenterDisplay(presenterAutoDisplayId);
-      } else {
-        presenterDisplayIsAuto = true;
-        presenterDisplayLabel = '';
-      }
-
-      setPresenterState(Boolean(state.presentationWindow && !state.presentationWindow.closed));
-    }).catch(() => {});
-
-    refs.presenterDisplayPicker.addEventListener('change', () => {
-      const value = refs.presenterDisplayPicker.value;
-      if (!value) {
-        localStorage.removeItem('presenterDisplayId');
-        api.setPresenterDisplay(null);
-        presenterDisplayIsAuto = true;
-        presenterDisplayLabel = presenterAutoDisplayLabel;
-        setPresenterState(Boolean(state.presentationWindow && !state.presentationWindow.closed));
-        return;
-      }
-      const displayId = Number(value);
-      localStorage.setItem('presenterDisplayId', String(displayId));
-      api.setPresenterDisplay(displayId);
-      presenterDisplayIsAuto = false;
-      presenterDisplayLabel = refs.presenterDisplayPicker.selectedOptions[0]?.textContent || '';
-      setPresenterState(Boolean(state.presentationWindow && !state.presentationWindow.closed));
+    if (!api || !refs.presenterDisplayWrap || !refs.presenterDisplayPicker || !window.DisplayPicker) return;
+    if (displayPicker) return;
+    displayPicker = window.DisplayPicker.create(refs.presenterDisplayPicker, {
+      api,
+      onChange: onPickerChange,
     });
+  };
+
+  const getSelectedPresenterDisplayIds = () => {
+    return displayPicker ? displayPicker.getSelectedIds() : [];
   };
 
   refs.search.addEventListener('input', filterList);

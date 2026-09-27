@@ -27,4 +27,36 @@ contextBridge.exposeInMainWorld('presenterApi', {
   },
   pickBackgroundImage: () => ipcRenderer.invoke('pick-background-image'),
   closeWindow: () => ipcRenderer.send('presenter-close-window'),
+  onDisplaysChanged: (callback) => {
+    if (typeof callback !== 'function') return () => {};
+    const handler = () => callback();
+    ipcRenderer.on('displays-changed', handler);
+    return () => {
+      ipcRenderer.removeListener('displays-changed', handler);
+    };
+  },
+});
+
+contextBridge.exposeInMainWorld('updateApi', {
+  getState: () => ipcRenderer.invoke('update:get-state'),
+  check: () => ipcRenderer.invoke('update:check'),
+  download: () => ipcRenderer.invoke('update:download'),
+  defer: () => ipcRenderer.send('update:defer'),
+  restart: () => ipcRenderer.send('update:restart'),
+  onStatus: (callback) => {
+    if (typeof callback !== 'function') return () => {};
+    const handler = (_event, state) => callback(state);
+    ipcRenderer.on('update:status', handler);
+    return () => {
+      ipcRenderer.removeListener('update:status', handler);
+    };
+  },
+  onReady: (callback) => {
+    if (typeof callback !== 'function') return () => {};
+    const handler = (_event, data) => callback(data);
+    ipcRenderer.on('update:ready', handler);
+    return () => {
+      ipcRenderer.removeListener('update:ready', handler);
+    };
+  },
 });

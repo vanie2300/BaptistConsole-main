@@ -52,11 +52,13 @@ body {
     display: none;
 }
 #slideContent {
-    
+    width: 100vw;
+    height: 100vh;
+    box-sizing: border-box;
     display: flex;
     flex-direction: column;
-    justify-content: flex-start;   /* Snap content to top */
-    align-items: stretch;          /* Make children full width */
+    justify-content: center;       /* Center content vertically */
+    align-items: center;           /* Center content horizontally */
     padding: 2vw 3vw;
     text-align: left;
     overflow-y: hidden;
@@ -72,9 +74,12 @@ body {
     font-size: 2vw;
     margin: 0;
     padding: 0;
+    width: 100%;
+    text-align: left;
     color: var(--primary);
     letter-spacing: 0.05em;
     text-shadow: 0 2px 8px #000a;
+    flex-shrink: 0;
 }
 .slide-title {
     font-weight: bold;
@@ -95,6 +100,8 @@ body {
     text-shadow: 0 2px 8px #000a;
     width: 100%;
     word-break: break-word;
+    flex-shrink: 0;
+    min-height: 0;
 }
 #slideContent.centered {
     justify-content: center !important;
@@ -139,10 +146,12 @@ function escapeHtml(text) {
 function renderSlide(fade) {
     const slide = slides[currentIndex] || { lines: ['End of hymn'] };
     const container = document.getElementById('slideContent');
-    const align = window._hymnAlign || localStorage.getItem('settings_hymnAlign') || 'left';
+    const align = window._hymnAlign || localStorage.getItem('settings_hymnAlign') || 'center';
     const layout = window._hymnLayout || localStorage.getItem('settings_hymnLayout') || 'full';
     const showNumbers = window._hymnShowNumbers !== undefined ? window._hymnShowNumbers : (localStorage.getItem('settings_hymnShowNumbers') !== 'false');
     const titleSize = window._hymnTitleSize || Number(localStorage.getItem('settings_hymnTitleSize')) || 7;
+    const slideFontSize = window._hymnFontSize || Number(localStorage.getItem('settings_hymnFontSize')) || 7;
+    const lyricScale = slideFontSize / 7;
     const transition = _hymnTransition || 'none';
 
     function paintSlide() {
@@ -161,25 +170,26 @@ function renderSlide(fade) {
             autoFitText(document.getElementById('autoFitTarget'), titleSize, 2);
         } else {
             container.classList.remove('centered');
-            const label = slide.type === 'chorus' ? 'Chorus' : 'Verse ' + slide.number;
+            const totalVerses = slides.reduce((m, s) => (s.type === 'verse' ? Math.max(m, s.number || 0) : m), 0);
+            const label = slide.type === 'chorus'
+                ? 'Chorus'
+                : (slide.number === totalVerses ? 'Last verse' : `${slide.number}/${totalVerses}`);
             const content = (slide.lines || []).map(escapeHtml).join('<br>');
             if (showNumbers) {
                 container.innerHTML = `
                     <div class="slide-label" id="autoFitLabel" style="font-weight:${weight}; font-family:${font}">${label}</div>
                     <div class="slide-lyrics" id="autoFitLyrics" style="font-weight:${weight}; font-family:${font}">${content}</div>
                 `;
-                autoFitText(document.getElementById('autoFitLyrics'), 6.5, 4);
-                autoFitText(document.getElementById('autoFitLabel'), 3, 1.2);
+                autoFitText(document.getElementById('autoFitLyrics'), slideFontSize, 4, lyricScale);
+                autoFitText(document.getElementById('autoFitLabel'), 3, 1.2, lyricScale);
             } else {
                 container.innerHTML = `
                     <div class="slide-lyrics" id="autoFitLyrics" style="font-weight:${weight}; font-family:${font}">${content}</div>
                 `;
-                autoFitText(document.getElementById('autoFitLyrics'), 7, 4);
+                autoFitText(document.getElementById('autoFitLyrics'), slideFontSize, 4, lyricScale);
             }
         }
-        autoFitText(container);
     }
-
     if (fade && transition === 'fade' && !_fadeLock) {
         _fadeLock = true;
         container.style.opacity = '0';
@@ -236,17 +246,51 @@ function applyThemeFromStorage() {
     document.documentElement.classList.toggle('theme-light', theme === 'light');
 }
 
-function autoFitText(container, maxFont = 8, minFont = 4) {
-    // Try to fit the text by shrinking font-size (in vw) until it fits or hits minFont
-    let fontSize = maxFont;
-    container.style.fontSize = fontSize + 'vw';
-    // Use a timeout to ensure rendering is complete
-    setTimeout(() => {
-        while ((container.scrollHeight > container.parentElement.clientHeight || container.scrollWidth > container.parentElement.clientWidth) && fontSize > minFont) {
-            fontSize -= 0.2;
-            container.style.fontSize = fontSize + 'vw';
+function autoFitText(container, maxFont = 8, minFont = 4, scale = 1) {
+    // Fit an element against the projection window's real width AND height
+    // (the window is sized to the target screen). Binary-search for the
+    // largest font-size (vw) that fits on both axes, within [minFont, maxFont],
+    // then apply an optional scale multiplier (e.g. the slide-size slider).
+    if (!container) return null;
+    const parent = container.parentElement;
+    if (!parent || container === parent) return null;
+    const pStyle = getComputedStyle(parent);
+    const availW = parent.clientWidth - (parseFloat(pStyle.paddingLeft || 0) + parseFloat(pStyle.paddingRight || 0));
+    let availH = parent.clientHeight - (parseFloat(pStyle.paddingTop || 0) + parseFloat(pStyle.paddingBottom || 0));
+    if (!availW || !availH) return null;
+
+    // Reserve room for sibling elements (e.g. the verse label) so nothing clips.
+    Array.from(parent.children).forEach(function (el) {
+        if (el !== container) availH -= (el.offsetHeight || 0);
+    });
+    var gapMatch = /^([\d.]+)vw$/.exec(pStyle.gap || '');
+    if (gapMatch) availH -= (parseFloat(gapMatch[1]) / 100) * parent.clientWidth;
+
+    function fits(vw) {
+        container.style.fontSize = vw + 'vw';
+        return container.scrollHeight <= availH + 1 && container.scrollWidth <= availW + 1;
+    }
+
+    if (!fits(minFont)) {
+        container.style.fontSize = minFont + 'vw';
+        return Math.max(minFont * scale, 0.5);
+    }
+
+    var lo = minFont;
+    var hi = maxFont;
+    var best = minFont;
+    for (var i = 0; i < 14; i++) {
+        var mid = Math.round(((lo + hi) / 2) * 100) / 100;
+        if (fits(mid)) {
+            best = mid;
+            lo = mid + 0.1;
+        } else {
+            hi = mid - 0.1;
         }
-    }, 0);
+    }
+    var chosen = Math.max(minFont, Math.round(best * 100) / 100) * scale;
+    container.style.fontSize = chosen + 'vw';
+    return chosen;
 }
 
 // Listen for messages from the main window
@@ -259,6 +303,7 @@ window.addEventListener('message', function(e) {
         if (e.data.layout) window._hymnLayout = e.data.layout;
         if (typeof e.data.showNumbers === 'boolean') window._hymnShowNumbers = e.data.showNumbers;
         if (typeof e.data.titleSize === 'number') window._hymnTitleSize = e.data.titleSize;
+        if (typeof e.data.fontSize === 'number') window._hymnFontSize = e.data.fontSize;
         if (e.data.transition && ['none', 'fade'].includes(e.data.transition)) _hymnTransition = e.data.transition;
         renderSlide();
     } else if (e.data && e.data.type === 'navigate') {
@@ -285,10 +330,40 @@ window.addEventListener('message', function(e) {
         if (e.data.layout) window._hymnLayout = e.data.layout;
         if (typeof e.data.showNumbers === 'boolean') window._hymnShowNumbers = e.data.showNumbers;
         if (typeof e.data.titleSize === 'number') window._hymnTitleSize = e.data.titleSize;
+        if (typeof e.data.fontSize === 'number') window._hymnFontSize = e.data.fontSize;
         if (e.data.transition && ['none', 'fade'].includes(e.data.transition)) _hymnTransition = e.data.transition;
         renderSlide();
 }
 }, true);
+
+let _fitTimer = null;
+function scheduleRefit() {
+    clearTimeout(_fitTimer);
+    _fitTimer = setTimeout(function() {
+        if (slides.length) renderSlide();
+    }, 150);
+}
+window.addEventListener('resize', scheduleRefit);
+document.addEventListener('fullscreenchange', scheduleRefit);
+if (window.visualViewport) {
+    window.visualViewport.addEventListener('resize', scheduleRefit);
+}
+
+// Live settings: re-render when a hymn settings key changes in the shared
+// localStorage (belt-and-suspenders on top of the postMessage update chain).
+var HYMN_SETTING_KEYS = [
+    'settings_hymnFontSize',
+    'settings_hymnTitleSize',
+    'settings_hymnAlign',
+    'settings_hymnLayout',
+    'settings_hymnShowNumbers',
+    'settings_hymnTransition',
+];
+window.addEventListener('storage', function(e) {
+    if (e.key && HYMN_SETTING_KEYS.indexOf(e.key) !== -1 && slides.length) {
+        renderSlide();
+    }
+});
 
 window.addEventListener('load', function() {
     applyThemeFromStorage();

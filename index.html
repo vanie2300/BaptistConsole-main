@@ -25,10 +25,7 @@
   <header class="shell-header">
     <div class="header-left">
       <div class="brand-mark">
-        <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-          <path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20"/>
-          <path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z"/>
-        </svg>
+        <img src="icon.png" alt="Baptist Console logo" />
       </div>
       <div class="brand-text">
         <span class="brand-name">Baptist Console</span>
@@ -60,6 +57,7 @@
         <svg xmlns="http://www.w3.org/2000/svg" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
           <path d="M14.7 6.3a1 1 0 0 0 0 1.4l1.6 1.6a1 1 0 0 0 1.4 0l3.77-3.77a6 6 0 0 1-7.94 7.94l-6.91 6.91a2.12 2.12 0 0 1-3-3l6.91-6.91a6 6 0 0 1 7.94-7.94l-3.76 3.76z"/>
         </svg>
+        <span class="settings-btn-dot" id="settingsBtnDot" hidden></span>
       </button>
       <div class="header-window-controls">
         <button class="header-btn win-btn" id="minimizeBtn" title="Minimize" aria-label="Minimize">
@@ -124,6 +122,12 @@
             <circle cx="18" cy="16" r="3"/>
           </svg>
           Hymn Presenter
+        </button>
+        <button class="settings-sidebar-btn" data-panel="about">
+          <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <circle cx="12" cy="12" r="10"/><line x1="12" y1="16" x2="12" y2="12"/><line x1="12" y1="8" x2="12.01" y2="8"/>
+          </svg>
+          About
         </button>
       </nav>
 
@@ -230,6 +234,15 @@
                 </div>
                 <span class="settings-toggle-hint">Scale the verse reference on the projected display</span>
               </div>
+              <div class="settings-field">
+                <label class="settings-label" for="biblePresentSize">Projected Text Size</label>
+                <div class="settings-field-row">
+                  <input type="range" id="biblePresentSizeRange" min="70" max="155" step="5" value="130">
+                  <input type="number" id="biblePresentSize" min="70" max="155" step="5" value="130" class="settings-number">
+                  <span class="settings-unit">%</span>
+                </div>
+                <span class="settings-toggle-hint">Scale the projected verse text (auto-fit)</span>
+              </div>
             </div>
           </div>
           <div class="settings-section">
@@ -243,6 +256,16 @@
                     <span class="settings-toggle-slider"></span>
                   </label>
                   <span class="settings-toggle-hint">Display reference above the verse text</span>
+                </div>
+              </div>
+              <div class="settings-field">
+                <label class="settings-label">Show Psalm Titles</label>
+                <div class="settings-toggle-row">
+                  <label class="settings-toggle">
+                    <input type="checkbox" id="bibleShowTitles" checked>
+                    <span class="settings-toggle-slider"></span>
+                  </label>
+                  <span class="settings-toggle-hint">Display the psalm heading (e.g. "A Psalm of David") in a smaller, muted style</span>
                 </div>
               </div>
             </div>
@@ -309,6 +332,13 @@
                 </div>
               </div>
               <div class="settings-field">
+                <label class="settings-label">Slide Font Size</label>
+                <div class="settings-field-row">
+                  <input type="range" id="hymnFontSize" min="3" max="12" step="0.5" value="7">
+                  <span class="settings-unit" id="hymnFontSizeValue">7vw</span>
+                </div>
+              </div>
+              <div class="settings-field">
                 <label class="settings-label">Slide Transition</label>
                 <div class="settings-segmented" id="hymnTransitionGroup">
                   <button class="settings-seg-btn active" data-value="none">None</button>
@@ -335,6 +365,67 @@
             </div>
           </div>
         </div>
+
+        <!-- About Panel -->
+        <div class="settings-panel" data-panel="about" hidden>
+          <div class="settings-panel-title">About</div>
+          <div class="settings-card">
+            <div class="about-hero">
+              <div class="about-logo">
+                <img src="icon.png" alt="Baptist Console logo" />
+              </div>
+              <div class="about-title">Baptist Console</div>
+              <div class="about-tagline">Church Presentation Suite</div>
+              <span class="about-version" id="aboutVersion">v1.0.0</span>
+            </div>
+            <p class="about-desc">Project Bible verses and hymns for your congregation. Free forever — no subscriptions, no premium tier.</p>
+            <section class="settings-section">
+              <div class="settings-section-label">Details</div>
+              <div class="about-meta">
+                <div class="about-meta-row"><span>Version</span><strong id="aboutVersionMeta">v1.0.0</strong></div>
+                <div class="about-meta-row"><span>Author</span><strong>Jovanie Cangke</strong></div>
+                <div class="about-meta-row"><span>License</span><strong>MIT</strong></div>
+                <div class="about-meta-row"><span>Platform</span><strong>Windows &middot; Linux</strong></div>
+              </div>
+            </section>
+            <section class="settings-section">
+              <div class="settings-section-label">Support the development</div>
+              <div class="about-support">
+                <p class="about-support-copy">Baptist Console is a ministry-driven open-source project created to serve churches. If you feel led to support the ongoing development and maintenance of the project, or would like to partner with us in its growth, please contact:</p>
+                <a class="about-support-mail" href="mailto:Jovaniecangke@gmail.com">
+                  <svg xmlns="http://www.w3.org/2000/svg" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="2" y="4" width="20" height="16" rx="2"/><path d="m22 7-10 5L2 7"/></svg>
+                  Jovaniecangke@gmail.com
+                </a>
+                <p class="about-support-thanks">Thank you for helping us continue providing free tools for churches and ministries.</p>
+              </div>
+            </section>
+            <section class="settings-section">
+              <div class="settings-section-label">Updates</div>
+              <div class="settings-card">
+                <div class="settings-update-status" id="updateStatus">
+                  <span class="settings-update-state" id="updateStateText">Checking for updates…</span>
+                  <span class="settings-update-version" id="updateStateDetail"></span>
+                  <span class="settings-update-badge" id="updateStateBadge" hidden>Update available</span>
+                </div>
+                <div class="settings-field">
+                  <button class="settings-btn-sm" id="checkForUpdates" type="button">Check for Updates</button>
+                  <button class="settings-btn-sm settings-btn-primary" id="installUpdateBtn" type="button" hidden>Install Update</button>
+                </div>
+              </div>
+            </section>
+            <section class="settings-section">
+              <div class="settings-section-label">Getting started</div>
+              <button class="about-action" id="aboutShowWelcome" type="button">
+                <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                  <path d="M12 3v5m0 8v5M3 12h5m8 0h5M5.6 5.6l3.5 3.5m5.8 5.8 3.5 3.5M18.4 5.6l-3.5 3.5m-5.8 5.8-3.5 3.5"/>
+                </svg>
+                Show Welcome Screen
+              </button>
+              <p class="about-note">Reopens the getting-started checklist. Uncheck "Don't show again" before closing to bring back the startup reminder.</p>
+            </section>
+            <div class="about-foot">Developed under the leadership of Malabuhan Bible Baptist Church &middot; Pastor Regino Kapunan<br>&copy; 2026 Jovanie Cangke</div>
+          </div>
+        </div>
       </div>
 
       <!-- Right Panel: Preview + Actions -->
@@ -345,6 +436,7 @@
             <!-- Theme/Bible preview (default) -->
             <div id="previewThemeBible">
               <div class="settings-preview-label" id="previewLabel">Verse 1</div>
+              <div class="settings-preview-title" id="previewTitle" hidden>A Psalm of David</div>
               <div class="settings-preview-verse" id="previewVerse">The Lord is my shepherd; I shall not want.</div>
               <div class="settings-preview-ref" id="previewRef">Psalm 23:1</div>
             </div>
@@ -379,7 +471,57 @@
     </div>
   </div>
 
+  <!-- ── Welcome Modal ── -->
+  <div class="welcome-modal" id="welcomeModal" hidden>
+    <div class="welcome-backdrop" id="welcomeBackdrop"></div>
+    <div class="welcome-card" role="dialog" aria-modal="true" aria-labelledby="welcomeTitle">
+      <button class="welcome-close" id="welcomeClose" title="Close" aria-label="Close">
+        <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+      </button>
+
+      <div class="welcome-brand">
+        <div class="welcome-logo">
+          <img src="icon.png" alt="Baptist Console logo" />
+        </div>
+        <div class="welcome-kicker">Welcome to</div>
+        <div class="welcome-title" id="welcomeTitle">Baptist Console</div>
+        <div class="welcome-sub">Church Presentation Suite — a few quick steps to get presenting.</div>
+      </div>
+
+      <ul class="welcome-list">
+        <li><span class="welcome-tick">1</span><span><strong>Pick a verse.</strong> Type a reference like <code>John 3:16</code> or search a word in the Bible tab.</span></li>
+        <li><span class="welcome-tick">2</span><span><strong>Project it.</strong> Press <strong>Present</strong> and choose which display opens the projection.</span></li>
+        <li><span class="welcome-tick">3</span><span><strong>Present hymns.</strong> Open the Hymns tab, pick a hymn, and press Present. Arrow keys move between slides, <span class="kbd">Esc</span> closes.</span></li>
+        <li><span class="welcome-tick">4</span><span><strong>Switch freely.</strong> Presenter windows are normal windows — <span class="kbd">Alt</span>+<span class="kbd">Tab</span> away any time.</span></li>
+        <li><span class="welcome-tick">5</span><span><strong>Make it yours.</strong> Settings → theme, colors, fonts, and separate Bible/Hymn background images.</span></li>
+      </ul>
+
+      <label class="welcome-never">
+        <input type="checkbox" id="welcomeNever">
+        <span>Don't show this again</span>
+      </label>
+      <button class="welcome-btn" id="welcomeGetStarted" type="button">Get Started</button>
+    </div>
+  </div>
+
   <div class="toast-container" id="toastContainer" aria-live="polite"></div>
+
+  <!-- ── Update Banner ── -->
+  <div class="update-banner" id="updateBanner" hidden role="dialog" aria-live="polite">
+    <div class="update-banner-icon">
+      <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+        <path d="M13 2 3 14h9l-1 8 10-12h-9l1-8z"/>
+      </svg>
+    </div>
+    <div class="update-banner-body">
+      <div class="update-banner-title" id="updateBannerTitle">Update available</div>
+      <div class="update-banner-text" id="updateBannerText"></div>
+      <div class="update-banner-actions">
+        <button class="update-banner-btn update-banner-btn-primary" id="updateBannerAction" type="button"></button>
+        <button class="update-banner-btn update-banner-btn-ghost" id="updateBannerLater" type="button"></button>
+      </div>
+    </div>
+  </div>
 
   <script src="theme.js?v=5"></script>
   <script src="shell.js?v=5"></script>

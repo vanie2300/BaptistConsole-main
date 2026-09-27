@@ -7,8 +7,9 @@
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
-  <link rel="stylesheet" href="../theme.css">
+<link rel="stylesheet" href="../theme.css">
   <link rel="stylesheet" href="presenter.css">
+  <link rel="stylesheet" href="../display-picker.css">
   <script>
     (() => {
       const theme = localStorage.getItem('globalTheme');
@@ -56,10 +57,8 @@
         </div>
         <div class="header-controls" data-ui="hymn-header-controls">
           <div class="presenter-display" id="presenterDisplayWrap" data-ui="hymn-presenter-display-select" hidden>
-            <div class="presenter-pill" data-ui="hymn-presenter-display-pill">
-              <select id="presenterDisplayPicker" class="presenter-select" aria-label="Presenter display">
-                <option value="">Auto</option>
-              </select>
+            <div class="presenter-pill">
+              <div id="presenterDisplayPicker" data-ui="hymn-presenter-display-picker"></div>
             </div>
           </div>
           <div class="present-status" id="presentStatus">Off</div>
@@ -132,6 +131,7 @@
   </div>
   <script src="../theme.js"></script>
   <script src="../presenter-proxy.js"></script>
+  <script src="../display-picker.js"></script>
   <script src="presenter.js"></script>
 
 </body>
