@@ -1,3 +1,11 @@
+<p align="center">
+  <picture>
+    <source media="(prefers-color-scheme: dark)" srcset="banner.png">
+    <source media="(prefers-color-scheme: light)" srcset="banner-light.png">
+    <img alt="Baptist Console — Church presentation, made simple" src="banner-light.png" width="100%">
+  </picture>
+</p>
+
 # Baptist Console
 
 A church presentation suite for projecting **Bible verses** and **hymns** during worship services. Built with Electron and vanilla HTML/CSS/JS.
