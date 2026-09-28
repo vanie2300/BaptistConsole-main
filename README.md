@@ -2,7 +2,7 @@
 
 A church presentation suite for projecting **Bible verses** and **hymns** during worship services. Built with Electron and vanilla HTML/CSS/JS.
 
-![Release](https://img.shields.io/badge/Release-v1.0.0-blue) ![Electron](https://img.shields.io/badge/Electron-33-blue) ![License](https://img.shields.io/badge/License-MIT-green)
+![Release](https://img.shields.io/badge/Release-v1.0.1-blue) ![Electron](https://img.shields.io/badge/Electron-33-blue) ![License](https://img.shields.io/badge/License-MIT-green)
 
 ## Features
 

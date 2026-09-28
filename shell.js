@@ -100,7 +100,7 @@
   };
 
   const WELCOME_KEY = 'settings_welcomeNeverShow';
-  const APP_VERSION = 'v1.0.0';
+  const APP_VERSION = 'v1.0.1';
 
   const DEFAULTS = {
     theme: 'dark',
