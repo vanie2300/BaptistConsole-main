@@ -1,0 +1,26 @@
+name: General feedback
+description: Say something about Baptist Console — praise, confusion, or a question
+title: "[Feedback] "
+labels:
+  - feedback
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Nothing is required. Write as much or as little as you like.
+
+  - type: textarea
+    id: message
+    attributes:
+      label: Your message
+      description: What is on your mind?
+    validations:
+      required: false
+
+  - type: textarea
+    id: context
+    attributes:
+      label: Anything that would help us understand?
+      description: Optional — which church, which computer, what you were trying to do, or what confused you.
+    validations:
+      required: false

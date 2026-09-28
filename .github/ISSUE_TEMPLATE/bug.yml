@@ -1,0 +1,56 @@
+name: Something is broken
+description: Report a problem or crash — plain language is perfect
+title: "[Problem] "
+labels:
+  - bug
+body:
+  - type: markdown
+    attributes:
+      value: |
+        No technical words needed — just describe what you saw. Only the first box is required.
+
+  - type: textarea
+    id: what
+    attributes:
+      label: What happened?
+      description: In your own words, what went wrong?
+      placeholder: The hymn presenter closed by itself when I pressed the next arrow.
+    validations:
+      required: true
+
+  - type: textarea
+    id: steps
+    attributes:
+      label: What were you doing just before it broke?
+      description: A few short steps help a lot, but you can skip this.
+      placeholder: |
+        1. Opened the Hymn presenter
+        2. Pressed the next arrow twice
+        3. The screen went black
+    validations:
+      required: false
+
+  - type: input
+    id: version
+    attributes:
+      label: Baptist Console version
+      description: Settings > About
+      placeholder: v1.0.0
+    validations:
+      required: false
+
+  - type: input
+    id: windows
+    attributes:
+      label: Windows version
+      placeholder: Windows 11
+    validations:
+      required: false
+
+  - type: textarea
+    id: extra
+    attributes:
+      label: Anything else?
+      description: You can drag screenshots straight into this box.
+    validations:
+      required: false

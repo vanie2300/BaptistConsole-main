@@ -1,0 +1,9 @@
+blank_issues_enabled: true
+
+contact_links:
+  - name: Email the developer (no account needed)
+    url: "mailto:Jovaniecangke@gmail.com?subject=Baptist%20Console%20feedback"
+    about: Prefer just sending a message? Email goes straight to the developer and needs no account.
+  - name: Read the Help & Support page
+    url: "https://github.com/vanie2300/BaptistConsole-main/blob/main/docs/help.html"
+    about: Common questions, troubleshooting steps, and ways to send feedback.

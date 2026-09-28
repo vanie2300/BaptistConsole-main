@@ -1,0 +1,36 @@
+name: I have an idea
+description: Suggest a new feature or a change to something existing
+title: "[Idea] "
+labels:
+  - feature
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Only the first box is required. Ideas are welcome whether or not you can build them.
+
+  - type: textarea
+    id: idea
+    attributes:
+      label: What would you like it to do?
+      description: Describe the feature or change in your own words.
+      placeholder: Let me add my own background photo for the hymn slides.
+    validations:
+      required: true
+
+  - type: textarea
+    id: why
+    attributes:
+      label: Why would it help?
+      description: Optional, but it helps others decide if it should be built.
+      placeholder: Our church shows a different slide each service, so we retype the title every week.
+    validations:
+      required: false
+
+  - type: textarea
+    id: workaround
+    attributes:
+      label: Is there a way you work around it today?
+      description: Optional. A workaround often reveals what is really needed.
+    validations:
+      required: false
