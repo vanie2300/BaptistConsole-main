@@ -1109,6 +1109,87 @@
     aboutShowWelcome.addEventListener('click', openWelcome);
   }
 
+  // ── Feedback ──
+  const FEEDBACK_EMAIL = 'Jovaniecangke@gmail.com';
+  const REPO_URL = 'https://github.com/vanie2300/BaptistConsole-main';
+  const externalApi = window.externalApi;
+
+  function platformSummary() {
+    const match = /Windows NT ([\d.]+)/.exec(navigator.userAgent);
+    if (match) return `Windows NT ${match[1]}`;
+    const uaData = navigator.userAgentData;
+    return (uaData && uaData.platform) || navigator.platform || 'Unknown';
+  }
+
+  function feedbackMessage() {
+    return [
+      'Type: (bug / idea / question / just saying hi)',
+      '',
+      'What happened, or what I would like:',
+      '',
+      '',
+      `Baptist Console version: ${APP_VERSION}`,
+      `Windows: ${platformSummary()}`,
+      '',
+    ].join('\n');
+  }
+
+  function openExternal(url) {
+    if (externalApi && typeof externalApi.open === 'function') {
+      externalApi.open(url);
+      return;
+    }
+    window.open(url, '_blank');
+  }
+
+  const aboutSendFeedback = document.getElementById('aboutSendFeedback');
+  if (aboutSendFeedback) {
+    aboutSendFeedback.addEventListener('click', () => {
+      openExternal(`mailto:${FEEDBACK_EMAIL}?subject=${encodeURIComponent('Baptist Console feedback')}&body=${encodeURIComponent(feedbackMessage())}`);
+    });
+  }
+
+  const aboutCopyFeedback = document.getElementById('aboutCopyFeedback');
+  if (aboutCopyFeedback) {
+    aboutCopyFeedback.addEventListener('click', () => {
+      const text = feedbackMessage();
+      function done() {
+        showToast('Message copied — paste it anywhere');
+      }
+      if (navigator.clipboard && navigator.clipboard.writeText) {
+        navigator.clipboard.writeText(text).then(done, () => fallback());
+      } else {
+        fallback();
+      }
+      function fallback() {
+        const ta = document.createElement('textarea');
+        ta.value = text;
+        ta.style.position = 'fixed';
+        ta.style.opacity = '0';
+        document.body.appendChild(ta);
+        ta.select();
+        try { document.execCommand('copy'); } catch (e) {}
+        document.body.removeChild(ta);
+        done();
+      }
+    });
+  }
+
+  const aboutReportIssue = document.getElementById('aboutReportIssue');
+  if (aboutReportIssue) {
+    aboutReportIssue.addEventListener('click', () => {
+      openExternal(`${REPO_URL}/issues/new/choose`);
+    });
+  }
+
+  // Route any mailto: link (e.g. the support address) through the OS handler
+  document.addEventListener('click', (e) => {
+    const link = e.target.closest ? e.target.closest('a[href^="mailto:"]') : null;
+    if (!link) return;
+    e.preventDefault();
+    openExternal(link.href);
+  });
+
   // ── In-app Updates ──
   const updateApi = window.updateApi;
   const updateBanner = document.getElementById('updateBanner');

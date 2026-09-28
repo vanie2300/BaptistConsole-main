@@ -1,4 +1,4 @@
-const { app, BrowserWindow, ipcMain, screen, dialog } = require('electron');
+const { app, BrowserWindow, ipcMain, screen, dialog, shell } = require('electron');
 const path = require('path');
 const fs = require('fs');
 const { autoUpdater } = require('electron-updater');
@@ -46,6 +46,18 @@ function ensureUserHymnsFile() {
 }
 
 // ── IPC Handlers ──
+
+const EXTERNAL_ALLOWLIST = [
+  /^mailto:[^@\s]+@[^@\s]+\.[^@\s]+$/i,
+  /^https:\/\/github\.com\/vanie2300\/BaptistConsole-main/i,
+];
+
+ipcMain.on('open-external', (_event, url) => {
+  if (typeof url !== 'string') return;
+  const trimmed = url.trim();
+  if (!EXTERNAL_ALLOWLIST.some((pattern) => pattern.test(trimmed))) return;
+  shell.openExternal(trimmed).catch(() => {});
+});
 
 ipcMain.handle('get-displays', () => {
   const displays = screen.getAllDisplays();
